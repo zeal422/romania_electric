@@ -53,7 +53,7 @@ export default function Home() {
   const renewableShare = dataQuery.data?.summary.renewableShareAvg;
 
   return (
-    <div className="grid-bg-dark dark:grid-bg-dark grid-bg-light flex min-h-screen flex-col bg-background">
+    <div className="bg-aura-light dark:bg-aura-dark flex min-h-screen flex-col bg-background">
       <Header summary={summary} />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 sm:px-6">

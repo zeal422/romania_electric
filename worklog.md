@@ -58,3 +58,21 @@ Stage Summary:
 - Hydration mismatch rezolvat definitiv (useSyncExternalStore, nu useEffect).
 - CI check `bun run check:hydration` adăugat și demonstrat că prinde eroarea.
 - Toate check-urile green: lint, 55/55 teste, Prettier, hydration.
+
+---
+Task ID: BG (background grid fix)
+Agent: main
+Task: Remediere fundal "grid pattern" care arăta oribil
+
+Work Log:
+- Diagnostic cu VLM pe screenshot-ul utilizatorului: grila albă pe fundal dark apărea inegală/distorsionată (moaré, linii rupte la edges).
+- Root cause: în page.tsx aplicasem DOUĂ clase simultan — `grid-bg-dark` și `grid-bg-light` pe același element, deci ambele grile (light+dark) randau suprapus pe orice temă.
+- Decizie: elimin grila complet (decorațiune fără valoare, doar zgomot vizual). Înlocuiesc cu un gradient radial subtil (`bg-aura-light` / `bg-aura-dark`) aplicat corect pe temă (`dark:bg-aura-dark`), care dă o aură de "control room" fără moaré/tile artifacts.
+- Modificat globals.css (eliminat .grid-bg-*, adăugat .bg-aura-*) și page.tsx (wrapper folosește bg-aura-light dark:bg-aura-dark).
+- Verificat cu VLM pe screenshot nou (dark): "clean and professional, solid dark gray, no visible grid". Light: "clean, solid white, no broken grid pattern".
+- Toate check-urile green: lint, 55/55 teste, Prettier, hydration.
+
+Stage Summary:
+- Fundal curat, profesional, fără grilă defectă.
+- Tema dark: fundal charcoal solid cu aură radială subtilă în partea de sus.
+- Tema light: fundal alb curat cu aură verde-discret sus.

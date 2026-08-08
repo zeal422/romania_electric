@@ -126,19 +126,22 @@
   }
 }
 
-/* Subtil fundal de tip grilă pentru estetica "control room" (doar dark) */
+/* Subtil gradient radial pentru estetică "control room" (doar dark),
+   fără grilă care crea moaré / linii inegale la tile. */
 @layer utilities {
-  .grid-bg-dark {
-    background-image:
-      linear-gradient(to right, oklch(0.28 0.008 240 / 22%) 1px, transparent 1px),
-      linear-gradient(to bottom, oklch(0.28 0.008 240 / 22%) 1px, transparent 1px);
-    background-size: 32px 32px;
+  .bg-aura-dark {
+    background-image: radial-gradient(
+      circle at 50% 0%,
+      oklch(0.22 0.01 240 / 60%) 0%,
+      transparent 55%
+    );
   }
-  .grid-bg-light {
-    background-image:
-      linear-gradient(to right, oklch(0.9 0.004 240) 1px, transparent 1px),
-      linear-gradient(to bottom, oklch(0.9 0.004 240) 1px, transparent 1px);
-    background-size: 32px 32px;
+  .bg-aura-light {
+    background-image: radial-gradient(
+      circle at 50% 0%,
+      oklch(0.97 0.006 162 / 50%) 0%,
+      transparent 55%
+    );
   }
   .tnum {
     font-variant-numeric: tabular-nums;
