@@ -38,3 +38,23 @@ Stage Summary:
 - 5546 înregistrări Transelectrica, 4 KPI-uri, 3 grafice interactice, tabel, donut mix curent.
 - Calitate: ESLint + Prettier + 55 teste unitare + TypeScript strict, toate green.
 - Design: dark-first "control room", accent emerald, culori semantice pe surse, românește peste tot, fără "AI slop".
+
+---
+Task ID: H (hydration fix)
+Agent: main
+Task: Fix hydration mismatch în ThemeToggle + adaugă CI check pentru erori de hidratare
+
+Work Log:
+- Diagnostic: `resolvedTheme` din next-themes e `undefined` pe server dar `"dark"` pe client → `aria-label`-ul butonului ThemeToggle difera → mismatch de hidratare.
+- Scan cod pentru alte riscuri: `Date.now()` (formatRelative), `toLocaleString` (format data) — toate sunt gardate de prezența datelor din React Query (care nu face fetch la SSR), deci nu rulează la hidratare. Singurul bug real: ThemeToggle.
+- Fix v1: pattern `useEffect(() => setMounted(true), [])` → respins de regula `react-hooks/set-state-in-effect`.
+- Fix final: hook `useMounted()` bazat pe `useSyncExternalStore` (getServerSnapshot=false, getSnapshot=true). React folosește snapshot-ul de server la SSR ȘI la prima hidratare → output identic → fără mismatch; după hidratare trece la snapshot client și re-randează. Lint-clean, fără setState în effect.
+- Creat `scripts/check-hydration.sh`: deschide pagina cu agent-browser, așteaptă networkidle + 2s, capturează console/errors, grep pentru tipare hydration. Ieșire 0=curat, 1=erori.
+- Adăugat `check:hydration` în package.json.
+- Verificat că check-ul are dinți: cu versiunea broken → check FAIL ("A tree hydrated but some attributes... detected"). Cu fix → check PASS. Doar așa e demonstrat că CI-ul prinde eroarea.
+- Verificat interactiv: theme toggle schimbă dark↔light, zero erori consolă.
+
+Stage Summary:
+- Hydration mismatch rezolvat definitiv (useSyncExternalStore, nu useEffect).
+- CI check `bun run check:hydration` adăugat și demonstrat că prinde eroarea.
+- Toate check-urile green: lint, 55/55 teste, Prettier, hydration.
