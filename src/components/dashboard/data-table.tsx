@@ -61,8 +61,9 @@ export function DataTable({ readings }: DataTableProps) {
         </TableHeader>
         <TableBody>
           {rows.map((r) => {
-            const isImport = r.sold < 0;
-            const isExport = r.sold > 0;
+            // Semantica sold: sold > 0 = import, sold < 0 = export.
+            const isImport = r.sold > 0;
+            const isExport = r.sold < 0;
             return (
               <TableRow
                 key={r.ts}

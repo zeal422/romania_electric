@@ -147,18 +147,18 @@ describe("balanceStats", () => {
     expect(b.importShare).toBe(0);
   });
 
-  it("splits positive/negative sold values", () => {
+  it("splits positive/negative sold values (positive = import, negative = export)", () => {
     const b = balanceStats([100, -200, 300, -100, 0]);
-    expect(b.importSamples).toBe(2); // -200, -100
-    expect(b.exportSamples).toBe(2); // 100, 300
+    expect(b.importSamples).toBe(2); // 100, 300
+    expect(b.exportSamples).toBe(2); // -200, -100
     expect(b.importShare).toBe(40); // 2 of 5
   });
 
   it("computes average import/export and net", () => {
     const b = balanceStats([1000, -500, 2000]);
-    // imports = [-500], exports = [1000, 2000]
-    expect(b.avgImport).toBe(-500);
-    expect(b.avgExport).toBe(1500);
+    // imports = [1000, 2000], exports = [-500]
+    expect(b.avgImport).toBe(1500);
+    expect(b.avgExport).toBe(-500);
     // net = mean([1000,-500,2000]) = 833.33 -> 833.3
     expect(b.netAvg).toBe(833.3);
   });

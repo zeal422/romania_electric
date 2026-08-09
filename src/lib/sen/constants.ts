@@ -113,8 +113,9 @@ export const SERIES_COLORS = {
   consum: "#dc2626", // red-600
   productie: "#059669", // emerald-600
   medieConsum: "#7c3aed", // violet-600
-  soldPositive: "#16a34a", // green-600 (export)
-  soldNegative: "#dc2626", // red-600 (import)
+  // Semantica sold: sold > 0 = IMPORT (deficit), sold < 0 = EXPORT (excedent).
+  soldPositive: "#dc2626", // red-600 (import)
+  soldNegative: "#16a34a", // green-600 (export)
 } as const;
 
 export const READING_FIELDS = [

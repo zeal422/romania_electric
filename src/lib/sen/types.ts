@@ -19,7 +19,7 @@ export interface SenReading {
   eolian: number;
   foto: number;
   biomasa: number;
-  /** Soldul energetic: pozitiv = export, negativ = import. */
+  /** Soldul energetic (SOLD = CONS − PROD): pozitiv = import, negativ = export. */
   sold: number;
 }
 
@@ -87,6 +87,12 @@ export interface SenApiResponse {
 
 /** Răspunsul endpoint-ului /api/sen/summary. */
 export interface SenSummaryResponse {
+  /**
+   * Numărul de înregistrări EXPUS (static + citiri live mai noi, dacă există).
+   * Poate depăși populația pe care s-au calculat `stats`/`balance`/`renewableShareAvg`,
+   * care rămân cele precalculate pe tot istoricul static — e intenționat (live-ul
+   * aduce doar câteva puncte recente; mediile globale nu trebuie să „sară” la fiecare refresh).
+   */
   count: number;
   start: string;
   end: string;
@@ -100,7 +106,9 @@ export interface SenSummaryResponse {
     importSamples: number;
     exportSamples: number;
     importShare: number;
+    /** Media soldurilor din probele de IMPORT (sold > 0) — valoare POZITIVĂ (ex: 1041.8). */
     avgImport: number;
+    /** Media soldurilor din probele de EXPORT (sold < 0) — valoare NEGATIVĂ (ex: -751.6). */
     avgExport: number;
     netAvg: number;
   };

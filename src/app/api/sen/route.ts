@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { aggregate, downsample, filterByRange } from "@/lib/sen/aggregate";
 import { fieldStats, renewableShare } from "@/lib/sen/stats";
 import type { Granularity, SenApiResponse } from "@/lib/sen/types";
-import { loadReadings, loadSummary } from "@/lib/sen/loader";
+import { getLiveReadings, getLiveSummary } from "@/lib/sen/live";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const granularity = parseGranularity(url.searchParams.get("granularity"));
 
-  const [readings, summary] = await Promise.all([loadReadings(), loadSummary()]);
+  const [readings, summary] = await Promise.all([getLiveReadings(), getLiveSummary()]);
   const from = parseRange(url.searchParams.get("from"), summary.startTs);
   const to = parseRange(url.searchParams.get("to"), summary.endTs);
 

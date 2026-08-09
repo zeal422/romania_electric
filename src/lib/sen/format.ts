@@ -47,17 +47,25 @@ export function formatSigned(value: number, decimals = 0): string {
   return `${sign}${formatNumber(Math.abs(value), decimals)}`;
 }
 
-/** Formatează soldul: pozitiv = export, negativ = import, cu etichetă. */
+/**
+ * Formatează soldul. Semantica (confirmată pe sursa oficială: SOLD = CONSUM − PRODUCȚIE,
+ * ex: CONS 4595 − PROD 5657 = −1062 = SOLD): sold > 0 = consum peste producție = IMPORT net,
+ * sold < 0 = producție peste consum = EXPORT net.
+ *
+ * NOTĂ `sign`: invers față de anii anteriori — `pos` (sold > 0) înseamnă acum IMPORT,
+ * `neg` (sold < 0) înseamnă EXPORT. Nu presupune „pos = export” folosind `sign`;
+ * testează direct `value > 0`/`value < 0` sau citește `label`.
+ */
 export function formatSold(value: number): {
   text: string;
   label: string;
   sign: "pos" | "neg" | "zero";
 } {
   if (value > 0) {
-    return { text: formatNumber(value), label: "Export", sign: "pos" };
+    return { text: formatNumber(value), label: "Import", sign: "pos" };
   }
   if (value < 0) {
-    return { text: formatNumber(Math.abs(value)), label: "Import", sign: "neg" };
+    return { text: formatNumber(Math.abs(value)), label: "Export", sign: "neg" };
   }
   return { text: "0", label: "Echilibru", sign: "zero" };
 }

@@ -16,6 +16,7 @@
     "check:hydration": "bash scripts/check-hydration.sh",
     "typecheck": "tsc --noEmit",
     "data:convert": "python3 scripts/convert-sen.py",
+    "data:refresh": "python3 scripts/convert-sen.py --fetch",
     "docs:check": "bash scripts/check-docs-stale.sh",
     "docs:mark-verified": "bash scripts/mark-docs-verified.sh",
     "check": "bun run format:check && bun run docs:check && bun run lint && bun run typecheck && bun run test && bun run build"

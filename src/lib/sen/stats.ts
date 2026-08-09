@@ -77,7 +77,11 @@ export function sourceShares(readings: SenReading[]): Record<SourceField, number
   return result;
 }
 
-/** Statistici balanță sold (import vs export). */
+/**
+ * Statistici balanță sold (import vs export).
+ * Semantica sold (confirmată pe sursa oficială, SOLD = CONS − PROD):
+ * sold > 0 = consum peste producție = IMPORT net; sold < 0 = EXPORT net.
+ */
 export interface BalanceStats {
   importSamples: number;
   exportSamples: number;
@@ -100,8 +104,8 @@ export function balanceStats(soldValues: number[]): BalanceStats {
       netAvg: 0,
     };
   }
-  const imports = finite.filter((v) => v < 0);
-  const exports = finite.filter((v) => v > 0);
+  const imports = finite.filter((v) => v > 0);
+  const exports = finite.filter((v) => v < 0);
   return {
     importSamples: imports.length,
     exportSamples: exports.length,

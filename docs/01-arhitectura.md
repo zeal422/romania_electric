@@ -7,7 +7,7 @@
 Dashboard web pentru **Sistemul Energetic Național (SEN)** al României, construit pe date **Transelectrica**. Afișează consumul și producția de energie defalcate pe surse, balanța import/export și ponderea regenerabilă, la intervale de 10 minute.
 
 - Stack: **Next.js 16 (App Router) + React 19 + TypeScript strict + Tailwind 4 + shadcn/ui + Recharts + TanStack React Query**, rulat cu **Bun**.
-- Date: 5.546 înregistrări (01.07.2026 → 08.08.2026), fișier `upload/Grafic_SEN.xlsx`.
+- Date: 5.606 înregistrări (01.07.2026 → în prezent), setul crește zilnic prin fetch live Transelectrica (vezi [02-pipeline-date.md](./02-pipeline-date.md)); fișierul istoric e `upload/Grafic_SEN.xlsx`.
 
 ## Layerele proiectului
 
@@ -20,10 +20,11 @@ Dashboard web pentru **Sistemul Energetic Național (SEN)** al României, constr
 │   route.ts (agregare) · summary/ (KPI) · export/ (CSV)      │
 ├─────────────────────────────────────────────────────────────┤
 │ Logică pură de date  src/lib/sen/                           │
-│   aggregate · stats · format · constants · types · loader   │
+│   aggregate · stats · format · constants · types            │
+│   loader (fișiere, server-only) · live (fetch live, server) │
 ├─────────────────────────────────────────────────────────────┤
 │ Date statice  data/sen-data.json + sen-summary.json         │
-│   (generate de scripts/convert-sen.py din upload/*.xlsx)    │
+│   (generate de scripts/convert-sen.py: xlsx + fetch live)   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,15 +45,15 @@ Dashboard web pentru **Sistemul Energetic Național (SEN)** al României, constr
 
 ## Decizii cheie de arhitectură
 
-| Decizie                                                                   | Motiv                                                                                                                                                      |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Date statice JSON, nu bază de date**                                    | Datele se schimbă rar (snapshot Transelectrica); JSON + cache singleton e cel mai simplu și rapid.                                                         |
-| **`loader.ts` cu cache singleton**                                        | Citirea fișierului se face o singură dată per proces; API-urile devin foarte rapide.                                                                       |
-| **API-ul agreghează, clientul doar afișează**                             | Clientul primește puncte gata-agregate (raw/10m/oră/zi) — logica e testabilă și identică pentru toate vizualizările.                                       |
-| **Downsampling la 1.200 puncte** la granularitate `raw` pe intervale mari | Protejează browserul de desenarea a mii de puncte.                                                                                                         |
-| **Preset-urile de interval sunt relative la `endTs`**, nu la `now()`      | Datele au capăt fix (08.08.2026); „24 ore" trebuie raportat la ultima înregistrare, nu la momentul curent.                                                 |
-| **`reactStrictMode: true` + fără `ignoreBuildErrors`**                    | Build-ul validează tipurile; Strict Mode descoperă bug-uri de render (fix-ul de hidratare e deja în loc, vezi [05-ui-dashboard.md](./05-ui-dashboard.md)). |
-| **Interfața în română + formatare `Intl` ro-RO**                          | Publicul țintă e românesc; formatarea (spațiu mii, virgulă zecimale) e centralizată în `format.ts`.                                                        |
+| Decizie                                                                   | Motiv                                                                                                                                                           |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Date statice JSON + date live la runtime**                              | Istoricul stă în JSON (cache singleton); `live.ts` adaugă datele live Transelectrica cu TTL 10 min și fallback la statice — fără bază de date, simplu și rapid. |
+| **`loader.ts` cu cache singleton**                                        | Citirea fișierului se face o singură dată per proces; API-urile devin foarte rapide.                                                                            |
+| **API-ul agreghează, clientul doar afișează**                             | Clientul primește puncte gata-agregate (raw/10m/oră/zi) — logica e testabilă și identică pentru toate vizualizările.                                            |
+| **Downsampling la 1.200 puncte** la granularitate `raw` pe intervale mari | Protejează browserul de desenarea a mii de puncte.                                                                                                              |
+| **Preset-urile de interval sunt relative la `endTs`**, nu la `now()`      | Datele au capăt variabil (ultima înregistrare — static + live); „24 ore" trebuie raportat la ultima înregistrare, nu la momentul curent.                        |
+| **`reactStrictMode: true` + fără `ignoreBuildErrors`**                    | Build-ul validează tipurile; Strict Mode descoperă bug-uri de render (fix-ul de hidratare e deja în loc, vezi [05-ui-dashboard.md](./05-ui-dashboard.md)).      |
+| **Interfața în română + formatare `Intl` ro-RO**                          | Publicul țintă e românesc; formatarea (spațiu mii, virgulă zecimale) e centralizată în `format.ts`.                                                             |
 
 ## Fișierele principale
 

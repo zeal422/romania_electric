@@ -18,6 +18,7 @@ Toate rutele sunt în `src/app/api/sen/`. Sunt `force-dynamic` (fără cache la 
 
 **Comportament:**
 
+- **Datele includ și live-ul Transelectrica**: fiecare request merge datele statice cu ultimele date live (fetch cu cache TTL 10 min în `src/lib/sen/live.ts`). Dacă Transelectrica e indisponibilă, se folosesc doar datele statice (fallback silențios) — API-ul rămâne funcțional.
 - Filtrează după `[from, to]`, agreghează în bucket-uri, calculează media fiecărui câmp.
 - La `granularity=raw` pe intervale mari se aplică **downsampling uniform la 1.200 puncte** (`MAX_POINTS`) — protecție intenționată, nu o corecta.
 - Răspunsul include și statistici pe interval: `count`, `consum`/`productie`/`sold` (min/max/avg) și `renewableShareAvg`.
@@ -51,7 +52,7 @@ GET /api/sen?granularity=raw        # va face downsample la ≤1200 puncte
 
 ### `GET /api/sen/summary` — KPI global precalculat
 
-Fără parametri. Întoarce direct conținutul `data/sen-summary.json` (tip `SenSummaryResponse`): `count`, `start`/`end`, `latest`, `stats` pe toate câmpurile, `sources`, `renewableShareAvg`, `balance` (import/export).
+Fără parametri. Întoarce `data/sen-summary.json` (tip `SenSummaryResponse`) cu `latest`/`end`/`endTs`/`count` **actualizate din live** dacă Transelectrica are înregistrări mai noi (vezi `getLiveSummary`). Statisticile globale (`stats`, `balance`, `renewableShareAvg`) rămân cele precalculate — sunt pe tot istoricul.
 
 Folosit de pagina principală pentru KPI-uri și header, fără să încarce toate punctele.
 
@@ -84,4 +85,4 @@ Folosit de pagina principală pentru KPI-uri și header, fără să încarce toa
 
 - **Nu inventa granularități noi** — doar `raw | 10m | hour | day` (tipul [`Granularity`](../src/lib/sen/types.ts)).
 - `from`/`to` sunt **epoch ms** (numere), nu ISO.
-- Rutele sunt subțiri: toată logica e în `src/lib/sen/*` (vezi [04-strat-date.md](./04-strat-date.md)).
+- Rutele sunt subțiri: toată logica e în `src/lib/sen/*` (vezi [04-strat-date.md](./04-strat-date.md)). Fetch-ul live e în `live.ts` — nu-l replica în rute.

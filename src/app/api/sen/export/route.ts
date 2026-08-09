@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { filterByRange } from "@/lib/sen/aggregate";
-import { loadReadings, loadSummary } from "@/lib/sen/loader";
+import { getLiveReadings, getLiveSummary } from "@/lib/sen/live";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -48,8 +48,8 @@ function csvEscape(v: string): string {
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const readings = await loadReadings();
-  const summary = await loadSummary();
+  const readings = await getLiveReadings();
+  const summary = await getLiveSummary();
   const from = url.searchParams.get("from")
     ? Number(url.searchParams.get("from"))
     : summary.startTs;

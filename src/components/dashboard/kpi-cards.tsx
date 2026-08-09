@@ -3,7 +3,8 @@
 import { ArrowDownRight, ArrowUpRight, Leaf, Minus, Zap } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { formatMW, formatNumber, formatPercent, formatSigned } from "@/lib/sen/format";
+import { SERIES_COLORS } from "@/lib/sen/constants";
+import { formatNumber, formatPercent, formatSigned, formatSold } from "@/lib/sen/format";
 import type { SenSummaryResponse } from "@/lib/sen/types";
 
 interface KpiCardsProps {
@@ -17,6 +18,8 @@ interface KpiCardData {
   unit?: string;
   icon: React.ReactNode;
   accent: string;
+  /** Culoare inline opțională (ex: din SERIES_COLORS) — suplimentară la `accent`. */
+  accentStyle?: React.CSSProperties;
   sub: { label: string; value: string }[];
   trend?: { dir: "up" | "down" | "flat"; text: string; positive?: boolean };
 }
@@ -75,32 +78,31 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       ],
     },
     {
+      // Semantica sold (sursa oficială: SOLD = CONS − PROD): sold > 0 = IMPORT,
+      // sold < 0 = EXPORT. Eticheta și culorile vin din shared metadata
+      // (formatSold + SERIES_COLORS), nu sunt hardcodate aici.
       title: "Sold energetic",
       value: latest ? formatSigned(latest.sold) : "—",
       unit: "MW",
       icon:
         latest && latest.sold > 0 ? (
-          <ArrowUpRight className="h-4 w-4" />
-        ) : latest && latest.sold < 0 ? (
           <ArrowDownRight className="h-4 w-4" />
+        ) : latest && latest.sold < 0 ? (
+          <ArrowUpRight className="h-4 w-4" />
         ) : (
           <Minus className="h-4 w-4" />
         ),
-      accent:
+      accent: latest && latest.sold === 0 ? "text-muted-foreground" : "",
+      accentStyle:
         latest && latest.sold > 0
-          ? "text-emerald-500"
+          ? { color: SERIES_COLORS.soldPositive }
           : latest && latest.sold < 0
-            ? "text-red-500"
-            : "text-muted-foreground",
+            ? { color: SERIES_COLORS.soldNegative }
+            : undefined,
       sub: [
         {
-          label: latest && latest.sold >= 0 ? "Stare" : "Stare",
-          value:
-            latest && latest.sold > 0
-              ? "Export"
-              : latest && latest.sold < 0
-                ? "Import"
-                : "Echilibru",
+          label: "Stare",
+          value: latest ? formatSold(latest.sold).label : "—",
         },
         {
           label: "Net mediu",
@@ -147,7 +149,12 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
                 )}
               </p>
             </div>
-            <span className={`shrink-0 rounded-md bg-card/60 p-1.5 ${c.accent}`}>{c.icon}</span>
+            <span
+              className={`shrink-0 rounded-md bg-card/60 p-1.5 ${c.accent}`}
+              style={c.accentStyle}
+            >
+              {c.icon}
+            </span>
           </div>
 
           {c.trend && (

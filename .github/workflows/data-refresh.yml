@@ -1,0 +1,66 @@
+name: data-refresh
+
+# Rulează zilnic (03:30 UTC = 06:30 ora României, vara) ca datele SEN să fie
+# mereu la zi în repo; commit-ul declanșează redeploy-ul Vercel (Git integration).
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch SEN data (incremental, live endpoint Transelectrica)
+        # continue-on-error: un eșec tranzitoriu de rețea nu pierde ziua — step-ul
+        # de commit de mai jos nu comite nimic dacă datele nu s-au schimbat,
+        # iar cron-ul de a doua zi reîncearcă oricum.
+        continue-on-error: true
+        run: python3 scripts/convert-sen.py --fetch
+
+      - name: Verify data freshness (fail on repeated fetch failures)
+        # Prag 40h, calibrat pe contractul fake-UTC (endTs = wall-clock RO etichetat UTC,
+        # cu ~2-3h „înaintea” UTC-ului real). O zi pierdută dă ~21h la ora cronului (03:30
+        # UTC) și max ~36.5h chiar și la un workflow_dispatch seara → un singur eșec
+        # tranzitoriu nu produce alarmă niciodată. Două+ zile consecutive dau minim ~45h
+        # → eșec vizibil în Actions (roșu), semnalând probleme persistente de endpoint/rețea.
+        # 40h e în intervalul sigur (36.5h, 45h): prinde eșecurile repetate fără fals-pozitive.
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, time
+          path = "data/sen-summary.json"
+          if not os.path.exists(path):
+              print("::error::datele SEN lipsesc complet — refresh-ul a eșuat", file=sys.stderr)
+              sys.exit(1)
+          summary = json.load(open(path, encoding="utf-8"))
+          age_h = (time.time() - summary["endTs"] / 1000) / 3600
+          print(f"Latest record: {summary['end']} ({age_h:+.1f}h față de acum)")
+          if age_h > 40:
+              print(
+                  f"::error::datele SEN sunt vechi de {age_h:.1f}h — refresh-ul live "
+                  "a eșuat de mai multe ori consecutiv; verifică endpoint-ul Transelectrica",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
+
+      - name: Commit updated data (if any)
+        run: |
+          if git diff --quiet -- data/; then
+            echo "No changes — data already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/sen-data.json data/sen-summary.json
+          git commit -m "chore(data): refresh SEN data from Transelectrica"
+          git push

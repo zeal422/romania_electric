@@ -16,7 +16,7 @@ Ordinul (definit în `package.json`):
 2. **`docs:check`** — verifică că documentația e la zi cu codul (vezi mai jos)
 3. **`lint`** — ESLint
 4. **`typecheck`** — `tsc --noEmit` (TypeScript strict)
-5. **`test`** — `bun test` (63 teste unitare)
+5. **`test`** — `bun test` (90 teste unitare)
 6. **`build`** — `next build` (build standalone, **include validarea tipurilor** — `ignoreBuildErrors` e eliminat)
 
 ## Verificarea că documentația e la zi (`docs:check`)
@@ -45,14 +45,15 @@ Exemplu de output la cod modificat fără docs:
 ## Testele unitare (`bun test`)
 
 - **Runner**: Bun (`bun:test`) — zero config.
-- **Locație**: `tests/sen/` — 3 fișiere, **63 teste, 143 expect() calls**.
+- **Locație**: `tests/sen/` — 4 fișiere, **90 teste** (plus verificări pe date reale în loop).
 - **Ce acoperă**:
 
-| Fișier                        | Funcții testate                                                                                                                                                                                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tests/sen/aggregate.test.ts` | `mean`, `bucketKey` (raw/10m/hour/day), `aggregate` (grupare, medie, rotunjire, sortare, shape-ul punctelor), `filterByRange` (limite incluzive, capete opționale, gol), `downsample` (limite, păstrare primul/ultimul, maxPoints=1)                                                 |
-| `tests/sen/stats.test.ts`     | `fieldStats`, `renewableShare`, `sourceShares`, `balanceStats`, `latestReading`                                                                                                                                                                                                      |
-| `tests/sen/format.test.ts`    | `formatNumber` (separatori RO, zecimale, non-finit), `formatMW`, `formatSigned`, `formatSold` (Export/Import/Echilibru), `formatPercent`, `mwToGwh`, `formatDateTime` (an inclus/nu + TZ-independență), `formatTime`, `formatAxisTick`, `formatLastUpdatedLabel`, `granularityLabel` |
+| Fișier                        | Funcții testate                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/sen/aggregate.test.ts` | `mean`, `bucketKey` (raw/10m/hour/day), `aggregate` (grupare, medie, rotunjire, sortare, shape-ul punctelor), `filterByRange` (limite incluzive, capete opționale, gol), `downsample` (limite, păstrare primul/ultimul, maxPoints=1)                                                                                                                                                                                                                                        |
+| `tests/sen/stats.test.ts`     | `fieldStats`, `renewableShare`, `sourceShares`, `balanceStats` (split `> 0` import / `< 0` export), `latestReading`                                                                                                                                                                                                                                                                                                                                                         |
+| `tests/sen/format.test.ts`    | `formatNumber` (separatori RO, zecimale, non-finit), `formatMW`, `formatSigned`, `formatSold` (Import/Export/Echilibru — pozitiv = import), `formatPercent`, `mwToGwh`, `formatDateTime` (an inclus/nu + TZ-independență), `formatTime`, `formatAxisTick`, `formatLastUpdatedLabel`, `granularityLabel`                                                                                                                                                                     |
+| `tests/sen/live.test.ts`      | `parseLiveLine`/`parseLivePayload` (format live cu SOLD pe poziția 4 — ordinea diferă de xlsx!, markeri `*`, rânduri invalide), `mergeReadings` (dedupe pe ts, sortare), `bucharestOffsetMs` (EET/EEST + granițe DST), `buildLiveUrl` (query params), `getLiveReadings`/`getLiveSummary` (merge + fallback + fără date noi, timestamp relativ la `endTs` static), `hasSuspiciousNightSolar` (guard anti-shift, fereastra 00-06h: foto noaptea la 02/04:30/05:30, ziua, gol) |
 
 - **Regulă**: orice funcție nouă de calcul din `src/lib/sen/` **trebuie** să aibă test unitar în `tests/sen/`. Vezi [AGENTS.md](../AGENTS.md).
 
@@ -78,6 +79,12 @@ bun run check:hydration
 ./scripts/check-hydration.sh http://localhost:3000
 ```
 
+**Protocol pentru agenți (cine pornește / oprește serverul)** — vezi și [AGENTS.md §4.10](../AGENTS.md):
+
+1. **Verifică mai întâi dacă serverul rulează deja**: `curl -s --max-time 3 -o /dev/null -w '%{http_code}' http://localhost:3000` → **orice răspuns HTTP** (2xx/3xx/4xx/5xx) = e pornit, folosește-l direct; doar eșec de conectare (refuz de conexiune) = port liber.
+2. **Dacă nu rulează și vrei să-l pornești, întreabă utilizatorul întâi** (permisiune sau preferința lui de a-l porni personal) — nu porni un server din proprie inițiativă dacă utilizatorul e activ.
+3. **După verificare: oprește serverul DOAR dacă TU l-ai pornit** — oprește exact procesul/grupul salvat la pornire (vezi [AGENTS.md §4.10](../AGENTS.md)); **NU folosi `pkill -f 'next dev'`** (potrivește și procesele utilizatorului) și curăță `dev.log`. Dacă utilizatorul l-a pornit, lasă-l în pace — nu-l opri.
+
 De ce există: theme toggle-ul citește `resolvedTheme` (depinde de browser) — fix-ul e `useMounted()` (`useSyncExternalStore`), vezi [05-ui-dashboard.md](./05-ui-dashboard.md).
 
 ## Alte comenzi de verificare
@@ -95,10 +102,10 @@ De ce există: theme toggle-ul citește `resolvedTheme` (depinde de browser) —
 1. Fă modificarea (mică, localizată).
 2. Adaugă/actualizează teste unitare pentru logica nouă.
 3. Rulează `bun run check` (tot pipeline-ul).
-4. Dacă ai `agent-browser`: `bun run check:hydration` cu serverul pornit.
+4. Dacă ai `agent-browser`: `bun run check:hydration` cu serverul pornit (întâi verifici dacă rulează; dacă trebuie să-l pornești tu, cere acordul și oprește-l după — vezi §„Protocol pentru agenți").
 5. Verifică vizual în browser (teme light/dark + mobil ~390px) și consola fără erori.
 
 ## Statutul curent
 
-- Typecheck: curat · Lint: curat · Prettier: curat · 63/63 teste · Build standalone reușit.
+- Typecheck: curat · Lint: curat · Prettier: curat · 90/90 teste · Build standalone reușit.
 - Verificare în browser (Recharts, KPI, tabel): fără erori consolă, fără hydration warnings.

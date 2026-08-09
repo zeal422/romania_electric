@@ -8,8 +8,8 @@ Acest fișier îi ajută pe agenții AI (și pe orice dezvoltator nou) să lucre
 
 Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**, cu date Transelectrica:
 
-- **5.546 de înregistrări** la ~10 minute (01.07.2026 → 08.08.2026).
-- Câmpuri: `consum`, `medieConsum`, `productie`, `carbune`, `hidrocarburi`, `ape`, `nuclear`, `eolian`, `foto`, `biomasa`, `sold` (pozitiv = export, negativ = import).
+- **5.606 de înregistrări** la ~10 minute (01.07.2026 → 09.08.2026), în creștere zilnică (date live Transelectrica).
+- Câmpuri: `consum`, `medieConsum`, `productie`, `carbune`, `hidrocarburi`, `ape`, `nuclear`, `eolian`, `foto`, `biomasa`, `sold`. **Semantica sold** (confirmată pe sursa oficială, `SOLD = CONS − PROD`): pozitiv = import, negativ = export. ⚠️ **Ordinea coloanelor de la endpoint-ul live diferă de xlsx** — live pune `sold` pe poziția 4 (vezi [docs/02](./docs/02-pipeline-date.md)).
 - Stack: **Next.js 16 (App Router) + React 19 + TypeScript strict + Tailwind 4 + shadcn/ui + Recharts + React Query**, rulat cu **Bun**.
 
 ## 2. Comenzi esențiale (rulează-le înainte de a declara orice „gata")
@@ -18,7 +18,7 @@ Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**,
 bun install            # instalează dependențele (Bun, NU npm/pnpm/yarn)
 bun run dev            # server de dezvoltare pe :3000
 bun run check          # CI complet: format → docs → lint → typecheck → teste → build
-bun test               # 63 teste unitare — TOATE trebuie să treacă
+bun test               # 90 teste unitare — TOATE trebuie să treacă
 bun run typecheck      # tsc --noEmit — trebuie să fie curat
 bun run lint           # ESLint — trebuie să fie curat
 bun run format:check   # Prettier — trebuie să fie curat
@@ -34,20 +34,21 @@ bun run check:hydration  # verifică erori de hidratare în browser (necesită a
 
 ```
 src/lib/sen/        ← LOGICA DE DATE. Pură, tipizată, deterministă, testată.
+src/lib/sen/live.ts ← date live Transelectrica (server-only: fetch TTL + fallback static).
 src/app/api/sen/    ← API routes subțiri (fără logică de business).
 src/hooks/          ← Hook-uri client (React Query).
 src/components/dashboard/ ← UI dashboard. src/components/ui/ = shadcn/ui (nu modifica de mână).
 data/               ← sen-data.json + sen-summary.json (GENERATE, nu le edita manual).
 scripts/            ← convert-sen.py (pipeline date) + check-hydration.sh (CI).
-tests/sen/          ← 63 teste unitare pentru lib/sen.
+tests/sen/          ← 90 teste unitare pentru lib/sen (incl. live.ts).
 upload/             ← Grafic_SEN.xlsx (sursa datelor).
 ```
 
 ## 4. Reguli critice (încălcarea lor = bug)
 
-### 4.1. Loader-ul rulează DOAR pe server
+### 4.1. Loader-ul și datele live rulează DOAR pe server
 
-`src/lib/sen/loader.ts` folosește `node:fs` și `process.cwd()`. **Nu importa `@/lib/sen/loader` în cod de client** (componente `"use client"`, hooks, `page.tsx` care e client). Barrel-ul `@/lib/sen` (`index.ts`) e **client-safe** (doar logică pură) — `loader` nu trece prin el; API routes îl importă direct. Dacă ai nevoie de date pe client, folosește hook-urile din `src/hooks/use-sen-data.ts` (React Query + fetch la `/api/sen*`).
+`src/lib/sen/loader.ts` (fișiere JSON) și `src/lib/sen/live.ts` (fetch la Transelectrica) folosesc `node:fs` / `fetch` server-side. **Nu le importa în cod de client** (componente `"use client"`, hooks, `page.tsx` care e client). Barrel-ul `@/lib/sen` (`index.ts`) e **client-safe** (doar logică pură) — `loader`/`live` nu trec prin el; API routes le importă direct. Dacă ai nevoie de date pe client, folosește hook-urile din `src/hooks/use-sen-data.ts` (React Query + fetch la `/api/sen*`).
 
 ### 4.2. Logica de date rămâne pură
 
@@ -55,7 +56,12 @@ upload/             ← Grafic_SEN.xlsx (sursa datelor).
 
 ### 4.3. Datele din `data/` sunt generate
 
-Nu edita manual `sen-data.json` / `sen-summary.json`. Sunt produse de `scripts/convert-sen.py` din `upload/Grafic_SEN.xlsx` (`bun run data:convert`). Dacă „repar" niște date „ca să iasă testele", ai greșit — repară scriptul sau logica, nu datele.
+Nu edita manual `sen-data.json` / `sen-summary.json`. Sunt produse de `scripts/convert-sen.py`:
+
+- `bun run data:convert` — rebuild complet din `upload/Grafic_SEN.xlsx`.
+- `bun run data:refresh` — **fetch incremental** de pe endpoint-ul live Transelectrica (adaugă datele noi la setul existent, dedupe pe `ts`). Acesta rulează automat zilnic în CI (workflow `.github/workflows/data-refresh.yml`), ca istoricul să crească singur.
+
+Dacă „repar" niște date „ca să iasă testele", ai greșit — repară scriptul sau logica, nu datele.
 
 ### 4.4. Interfața este în română
 
@@ -94,6 +100,16 @@ Pentru detalii pe zone, începe cu indexul [`docs/00-index.md`](./docs/00-index.
 
 Regula de bază: dacă vrei să schimbi ceva legat de **date** → `src/lib/sen/`, de **HTTP** → `src/app/api/sen/`, de **UI** → `src/components/dashboard/` sau `src/hooks/`. Nu „găsi" singur locul — harta te duce direct.
 
+### 4.10. Serverul de dev: cine îl pornește, cine îl oprește
+
+`bun run dev` pornește un proces long-running pe :3000. Reguli pentru agenți:
+
+- **Înainte să pornești un server, verifică dacă rulează deja**: `curl -s --max-time 3 -o /dev/null -w '%{http_code}' http://localhost:3000` — **orice răspuns HTTP** (2xx/3xx/4xx/5xx) înseamnă că ceva ascultă pe :3000, deci un server e pornit; doar eșec de conectare (refuz de conexiune) = port liber. **Nu porni un al doilea server** (port ocupat → erori confuze).
+- **Dacă ai nevoie de server și nu rulează, cere acordul utilizatorului întâi** — întreabă dacă poți porni `bun run dev` sau dacă preferă să-l pornească el (poate lucra deja în terminal). Nu porni un server din proprie inițiativă dacă utilizatorul e activ.
+- **Dacă TU l-ai pornit, TREBUIE să-l oprești după ce termini testele** — pornește-l într-un grup de procese separat (ex: `setsid bun run dev > /tmp/sen-dev.log 2>&1 & echo $! > /tmp/sen-dev.pid`) și oprește DOAR acel grup (ex: `kill -- "-$(cat /tmp/sen-dev.pid)"`). **NU folosi `pkill -f 'next dev'`** — potrivește orice proces cu „next dev" în linia de comandă, inclusiv serverul utilizatorului. Curăță și artefactele (`dev.log`). Nu lăsa niciodată un server pornit de tine după ce nu mai ai nevoie de el.
+- **Dacă utilizatorul l-a pornit, NU-l opri** — e mediul lui de lucru; folosește-l și lasă-l așa.
+- Motiv: `bun run check:hydration` și verificările vizuale în browser au nevoie de serverul de dev pornit, dar procesele orfane blochează portul 3000 și încurcă rulările următoare.
+
 ## 5. Lucruri de evitat (mistakes comune)
 
 - ❌ Folosirea `npm install` / `pnpm` — proiectul e pe **Bun** (`bun.lock`).
@@ -121,9 +137,9 @@ Când primești o listă de „găsiri" / „probleme posibile" (de exemplu fiș
 2. **Verifică fiecare găsire contra codului actual**: citește fișierele vizate, caută consumatorii (importuri, apeluri), confirmă comportamentul real (ex: rulează un test sau un script). Unele găsiri pot fi deja rezolvate sau invalide — **sari peste ele cu un motiv scurt**.
 3. **Dacă o găsire implică o decizie de produs** (schimbă comportament vizibil, valori sau etichete), **întreabă utilizatorul** cu opțiuni clare înainte de a modifica (ex: „nuclearul e numărat în share-ul regenerabil — îl scoatem sau redenumim metrica?").
 4. **Fă schimbări minime și localizate** — repară cauza, nu simptomul.
-5. **Datele derivate se regenerează prin pipeline, nu manual**: după o modificare în `convert-sen.py`, rulează `bun run data:convert` (nu edita `data/*.json` de mână).
+5. **Datele derivate se regenerează prin pipeline, nu manual**: după o modificare în `convert-sen.py`, rulează `bun run data:convert` (rebuild) sau `bun run data:refresh` (incremental live) — nu edita `data/*.json` de mână.
 6. **Actualizează testele existente** și adaugă **teste de regresie** pentru comportamentul schimbat (ex: „nuclearul singur nu umflă share-ul regenerabil").
 7. **Ține documentația la zi**: cifrele și etichetele modificate se reflectă în `docs/`, `README.md`, `AGENTS.md` și `CHANGELOG.md` (ex: numărul de teste, valorile KPI, `renewableShareAvg`).
 8. **Rulează `bun run docs:mark-verified` + `bun run check` întreg** (format → docs → lint → typecheck → teste → build) — nu doar un subset.
-9. **Curăță artefactele de build** (`.next`, `tsconfig.tsbuildinfo`, `next-env.d.ts`, log-uri) și **oprește orice server** pornit pentru test.
+9. **Curăță artefactele de build** (`.next`, `tsconfig.tsbuildinfo`, `next-env.d.ts`, log-uri). **Oprește serverul de dev DOAR dacă tu l-ai pornit** (vezi §4.10) — dacă utilizatorul l-a pornit, lasă-l în pace.
 10. **Marchează găsirile ca rezolvate** în fișierul sursă (ex: adaugă în `TO_FIX.md` antetul „✅ TOATE REZOLVATE") ca agenții viitori să nu re-aplice fix-uri vechi.

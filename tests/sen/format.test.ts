@@ -8,6 +8,7 @@ import {
   formatMW,
   formatNumber,
   formatPercent,
+  formatRelative,
   formatSigned,
   formatSold,
   formatTime,
@@ -56,14 +57,14 @@ describe("formatSigned", () => {
 });
 
 describe("formatSold", () => {
-  it("labels positive as export", () => {
+  it("labels positive as import (SOLD = CONS − PROD, sold > 0 = import net)", () => {
     const r = formatSold(1042);
-    expect(r.label).toBe("Export");
+    expect(r.label).toBe("Import");
     expect(r.sign).toBe("pos");
   });
-  it("labels negative as import (absolute value)", () => {
+  it("labels negative as export (absolute value)", () => {
     const r = formatSold(-755);
-    expect(r.label).toBe("Import");
+    expect(r.label).toBe("Export");
     expect(r.sign).toBe("neg");
   });
   it("labels zero as equilibrium", () => {
@@ -117,6 +118,30 @@ describe("formatTime", () => {
   it("formats HH:MM", () => {
     const iso = "2026-08-08T09:05:00.000Z";
     expect(formatTime(iso)).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe("formatRelative", () => {
+  const iso = "2026-08-08T10:00:00.000Z";
+
+  it("returns 'acum câteva secunde' under a minute", () => {
+    // 10s rotunjit = 0 min; la 30s funcția dă deja „acum 1 min" (Math.round) — comportament intenționat.
+    expect(formatRelative(iso, Date.parse(iso) + 10_000)).toBe("acum câteva secunde");
+    expect(formatRelative(iso, Date.parse(iso) + 30_000)).toBe("acum 1 min");
+  });
+
+  it("returns minutes", () => {
+    expect(formatRelative(iso, Date.parse(iso) + 10 * 60_000)).toBe("acum 10 min");
+  });
+
+  it("returns singular and plural hours", () => {
+    expect(formatRelative(iso, Date.parse(iso) + 60 * 60_000)).toBe("acum 1 oră");
+    expect(formatRelative(iso, Date.parse(iso) + 3 * 60 * 60_000)).toBe("acum 3 ore");
+  });
+
+  it("returns singular and plural days", () => {
+    expect(formatRelative(iso, Date.parse(iso) + 24 * 60 * 60_000)).toBe("acum 1 zi");
+    expect(formatRelative(iso, Date.parse(iso) + 5 * 24 * 60 * 60_000)).toBe("acum 5 zile");
   });
 });
 

@@ -6,6 +6,53 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.3] — 2026-08-09, 10:45 EEST
+
+### Reparat
+
+- **Fereastra gardei anti-shift lărgită la 00-06h** (era 00-04h) în `hasSuspiciousNightSolar` (`live.ts`) și în sanity-check-ul din `convert-sen.py --fetch`. Vara, solarul e ~0 până la ~05:30-06:15 ora României, deci un shift de coloane care ar pune `eolian` (~680 MW) în `foto` la 04:00-05:00 scăpa de gardă. Fereastra nouă acoperă noaptea fizică de vară, fără fals-pozitive (verificat pe datele reale: primul `foto > 50` e la 06:13, max înainte de 06:00 = 13 MW).
+- **Workflow-ul `data-refresh` eșua silențios la eșecuri persistente**: adăugat pasul „Verify data freshness" — dacă `data/sen-summary.json` e mai vechi de ~40h (o zi pierdută dă ~21h la ora cronului și max ~36.5h chiar la un `workflow_dispatch` seara — deci un eșec tranzitoriu nu produce alarmă falsă niciodată; două+ zile consecutive dau minim ~45h), workflow-ul eșuează vizibil în Actions în loc să comite tăcut.
+- **Comentariu preventiv în `convert-sen.py`**: `tz=timezone.utc` la construirea `start`-ului e intenționat (contract fake-UTC — ts-urile sunt wall-clock România etichetat UTC) și NU trebuie schimbat pe `TZ_RO` (ar muta fereastra cu +2-3h și ar pierde date la fiecare refresh).
+
+### Adăugat
+
+- Două teste noi în `live.test.ts`: `hasSuspiciousNightSolar` prinde `foto > 50` la 04:30 și la 05:30 (fereastra 00-06h). Total: **90 de teste unitare**.
+- Comentarii explicite în `types.ts`: `SenSummaryResponse.count` poate include citiri live (stats/balance rămân pe istoricul static, intenționat); semnul `avgImport` (pozitiv = media soldurilor > 0) și `avgExport` (negativ = media soldurilor < 0).
+
+## [0.3.2] — 2026-08-09, 10:30 EEST
+
+### Reparat
+
+- **🔴 Ordinea coloanelor de la endpoint-ul live Transelectrica**: widget-ul „SEN Grafic" pune `Sold` pe poziția a 4-a (imediat după `Productie`), NU pe ultima ca în xlsx. `LIVE_FIELDS` (`convert-sen.py`) și `FIELD_ORDER` (`live.ts`) mapau greșit → toate datele live (atât cele de la `--fetch`, cât și la runtime) erau shiftate cu o poziție (carbune ⇄ sold etc.). Fix + sanity-check nou în `--fetch` („solarul nu produce noaptea" — oprește actualizarea la un posibil shift). Datele de pe disc au fost **regenerate complet** (`data:convert` + `data:refresh`) — fereastra de overlap coruptă și rândurile de noapte cu valori imposibile (foto 2247-2516 MW) sunt reparate (night foto max = −1).
+- **Semantica sold**: confirmată pe sursa oficială (`SOLD = CONS − PROD`, verificat pe `sen-filter`: CONS 4595 − PROD 5657 = −1062 = SOLD). Sold **pozitiv = import** (consum peste producție), **negativ = export** — UI-ul eticheta invers (pozitiv = „Export"). Actualizate: `formatSold`, `balanceStats` (split pe `> 0` import), `SERIES_COLORS` (pozitiv roșu / negativ verde), `KpiCards`, `BalanceChart`, `DataTable`.
+- **Dublu-fetch la Transelectrica pe cache rece**: `getLiveReadings()` rulează acum cu o promisiune în zbor partajată (`inflightFetch`) — `Promise.all([getLiveReadings(), getLiveSummary()])` face un singur fetch, nu două.
+- **Workflow-ul `data-refresh`**: `continue-on-error` pe step-ul de fetch (un eșec tranzitoriu de rețea nu mai pierde ziua — commit-ul se face doar dacă datele s-au schimbat) + `fetch_live` nu mai aruncă la `urllib.error` (întoarce date goale).
+- **Zero-pad query params** în `convert-sen.py` (`day=08`, `hour=06` etc.) — consistent cu `buildLiveUrl` din `live.ts`.
+
+### Adăugat
+
+- Test nou în `live.test.ts`: `parseLiveLine` validează ordinea live (`sold` pe 4) și o compară cu valorile xlsx la același ts (18:07:57); testele de merge folosesc timestampuri relative la `endTs` static (robuste la date noi pe disc). Total: **88 de teste unitare**.
+
+## [0.3.1] — 2026-08-09, 08:00 EEST
+
+### Reparat
+
+- `docs/01-arhitectura.md`: cifra înregistrărilor actualizată (5.546 → 5.599) + menționat `live.ts` în layere și fluxul de date live.
+
+### Adăugat
+
+- **Acoperire de teste mărită la ~100% pe `src/lib/sen/`**: `formatRelative` (toate branșele: secunde/minute/ore/zile, singular/plural), `getLiveReadings`/`getLiveSummary` cu fetch mock-uit (merge live + fallback la eșec + summary fără date noi), `loader` (`loadReadings`/`loadSummary` pe datele reale din repo, sortare verificată). Export nou `resetLiveCache()` pentru teste. Acum **84 de teste unitare**. Coverage raportat de `bun test --coverage`: aggregate/constants/format/live/stats/types = 100%, loader = 96% lines.
+
+## [0.3.0] — 2026-08-09, 07:00 EEST
+
+### Adăugat
+
+- **Date live Transelectrica** (`src/lib/sen/live.ts`, server-only): `/api/sen`, `/api/sen/summary` și `/api/sen/export` includ acum datele live de pe endpoint-ul public al widget-ului „SEN Grafic" (`transelectrica.ro/widget/web/tel/sen-grafic`, `p_p_lifecycle=2`) — cache TTL 10 min, **fallback silențios la datele statice** dacă Transelectrica e indisponibilă (dashboard-ul nu se rupe).
+- **`bun run data:refresh`** — mod `--fetch` în `scripts/convert-sen.py`: descarcă **incremental** (de la ultimul `ts` + 2h overlap) și adaugă datele noi la `data/sen-data.json` + regenerează summary-ul. Modul xlsx rămâne (import lazy `openpyxl`, refresh e stdlib-only).
+- **Workflow GitHub Actions** `.github/workflows/data-refresh.yml`: cron zilnic (03:30 UTC = 06:30 EEST vara) rulează `data:refresh` și face commit — istoricul crește singur, Vercel redeploy-ează automat (Git integration).
+- **13 teste noi** (`tests/sen/live.test.ts`): parsing live, dedupe/merge, offset EET/EEST cu granițe DST, construcția URL-ului — acum **76 de teste unitare, 186 expect()**.
+- Setul de date actualizat: **5.599 înregistrări** (01.07.2026 → 09.08.2026, 06:38), `renewableShareAvg` 48,8%.
+
 ## [0.2.3] — 2026-08-09, 05:56 EEST
 
 ### Reparat

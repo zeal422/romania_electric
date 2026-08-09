@@ -23,12 +23,26 @@ interface BalanceChartProps {
 }
 
 /**
- * Balanța energetică (Sold): aria cu gradient divergent — verde pozitiv (export),
- * roșu negativ (import) — cu linie de referință la zero. Arată când România
- * exportă vs când importă energie.
+ * Balanța energetică (Sold): aria cu gradient divergent — roșu pozitiv (import,
+ * consum peste producție), verde negativ (export, excedent) — cu linie de
+ * referință la zero. Arată când România importă vs când exportă energie.
+ * (Semantica sold din sursa oficială: SOLD = CONS − PROD.)
  */
 export function BalanceChart({ points, granularity }: BalanceChartProps) {
   const labels = useMemo(() => ({ sold: "Sold" }), []);
+
+  // Split pe semn pentru fill divergent: serii clamate la zero, ca fiecare arie
+  // să primească gradientul corect — import (sold > 0, grad-sold-pos) și
+  // export (sold < 0, grad-sold-neg). Linia „sold” rămâne seriile cu date reale.
+  const data = useMemo(
+    () =>
+      points.map((p) => ({
+        ...p,
+        soldImport: p.sold > 0 ? p.sold : 0,
+        soldExport: p.sold < 0 ? p.sold : 0,
+      })),
+    [points],
+  );
 
   // Calcul offset pentru a face gradientul divergent funcțional:
   // Recharts umple de la dataMin la valoare. Folosim un offset astfel încât
@@ -46,7 +60,7 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+      <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id="grad-sold-pos" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={SERIES_COLORS.soldPositive} stopOpacity={0.7} />
@@ -81,11 +95,29 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
         />
         <Area
           type="monotone"
+          dataKey="soldImport"
+          name="sold"
+          stroke="none"
+          fill="url(#grad-sold-pos)"
+          isAnimationActive={false}
+          tooltipType="none"
+        />
+        <Area
+          type="monotone"
+          dataKey="soldExport"
+          name="sold"
+          stroke="none"
+          fill="url(#grad-sold-neg)"
+          isAnimationActive={false}
+          tooltipType="none"
+        />
+        <Area
+          type="monotone"
           dataKey="sold"
           name="sold"
           stroke="var(--foreground)"
           strokeWidth={1.25}
-          fill="url(#grad-sold-pos)"
+          fill="none"
           isAnimationActive={false}
           connectNulls
         />

@@ -47,7 +47,7 @@ Variabilele sunt expuse ca token-uri Tailwind prin `@theme inline` (`--color-bac
 | Eolian       | renewable  | `#14b8a6` teal   | rgba(20,184,166,.6)   |
 | Foto         | renewable  | `#eab308` yellow | rgba(234,179,8,.6)    |
 
-Serii non-sursă (`SERIES_COLORS`): `consum` roșu `#dc2626`, `productie` emerald `#059669`, `medieConsum` violet `#7c3aed`, `soldPositive` verde, `soldNegative` roșu.
+Serii non-sursă (`SERIES_COLORS`): `consum` roșu `#dc2626`, `productie` emerald `#059669`, `medieConsum` violet `#7c3aed`, `soldPositive` roșu (import), `soldNegative` verde (export).
 
 > **Schimbă culorile DOAR în `constants.ts`.** Componentele citesc `SOURCES[f].color` / `SOURCES[f].fill` — nu le duplica în JSX.
 
