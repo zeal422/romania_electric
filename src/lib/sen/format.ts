@@ -5,7 +5,26 @@
  * (spațiu ca separator de mii, virgulă ca separator zecimal).
  */
 
+import type { Granularity } from "./types";
+
 const RO = "ro-RO";
+
+/**
+ * Label de axă X pentru graficele Recharts, adaptat la granularitate.
+ * Folosește UTC (contract de timp): cifrele din sursă apar identic pe orice fus.
+ * - day/hour → "8 aug"
+ * - raw/10m  → "18:07"
+ */
+export function formatAxisTick(ts: number, granularity: Granularity): string {
+  const d = new Date(ts);
+  if (granularity === "day" || granularity === "hour") {
+    const month = d.toLocaleString(RO, { month: "short", timeZone: "UTC" }).replace(/\.$/, "");
+    return `${d.getUTCDate()} ${month}`;
+  }
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
 
 /** Formatează un număr cu separator de mii (fără zecimale implicit). */
 export function formatNumber(value: number, decimals = 0): string {
@@ -58,31 +77,33 @@ export function mwToGwh(mw: number, hours: number): number {
  * Formatează un timestamp ISO într-un label scurt de tip zi/oră,
  * ex: "8 aug, 18:07". Folosește locale ro-RO.
  *
- * ATENȚIE: datele din fișierul Transelectrica sunt etichetate cu anul 2026.
- * Le afișăm fidel așa cum apar în sursă; nu modificăm anul.
+ * ATENȚIE (contract de timp): datele din fișierul Transelectrica sunt wall-clock
+ * românesc etichetat UTC (ex: `18:07` în sursă → `T18:07:57.000Z`). Le afișăm
+ * fidel cu getters UTC, ca cifrele din sursă să apară identic pe ORICE fus orar
+ * (server sau browser). Nu folosi getters locale — ar schimba ora afișată.
  */
 export function formatDateTime(iso: string, opts?: { withYear?: boolean }): string {
   const d = new Date(iso);
-  const month = d.toLocaleString(RO, { month: "short" }).replace(/\.$/, "");
-  const day = d.getDate();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const year = opts?.withYear ? ` ${d.getFullYear()}` : "";
+  const month = d.toLocaleString(RO, { month: "short", timeZone: "UTC" }).replace(/\.$/, "");
+  const day = d.getUTCDate();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  const year = opts?.withYear ? ` ${d.getUTCFullYear()}` : "";
   return `${day} ${month}${year}, ${hh}:${mm}`;
 }
 
 /** Formatează doar data (fără oră): "8 aug 2026". */
 export function formatDate(iso: string): string {
   const d = new Date(iso);
-  const month = d.toLocaleString(RO, { month: "short" }).replace(/\.$/, "");
-  return `${d.getDate()} ${month} ${d.getFullYear()}`;
+  const month = d.toLocaleString(RO, { month: "short", timeZone: "UTC" }).replace(/\.$/, "");
+  return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()}`;
 }
 
 /** Formatează doar ora: "18:07". */
 export function formatTime(iso: string): string {
   const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
 
@@ -96,6 +117,16 @@ export function formatRelative(iso: string, now = Date.now()): string {
   if (hours < 24) return `acum ${hours} ${hours === 1 ? "oră" : "ore"}`;
   const days = Math.round(hours / 24);
   return `acum ${days} ${days === 1 ? "zi" : "zile"}`;
+}
+
+/**
+ * Eticheta de accesibilitate pentru badge-ul „ultima înregistrare” din Header.
+ * „Înregistrare” e feminin, deci participiul e „actualizată”.
+ */
+export function formatLastUpdatedLabel(relative: string): string {
+  return relative
+    ? `Ultima înregistrare, actualizată ${relative}`
+    : "Ultima înregistrare, actualizată";
 }
 
 /** Etichetă scurtă pentru o granularitate. */

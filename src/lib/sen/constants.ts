@@ -16,8 +16,8 @@ export interface SourceMeta {
   color: string;
   /** Culoare pentru fundaluri semi-transparente (fill aria). */
   fill: string;
-  /** Clasificare pentru grupări (fossil / regenerabil). */
-  kind: "fossil" | "renewable";
+  /** Clasificare pentru grupări (fossil / low-carbon / regenerabil). */
+  kind: "fossil" | "lowcarbon" | "renewable";
   /** Descriere scurtă, pentru tooltip-uri și accesibilitate. */
   hint: string;
 }
@@ -56,8 +56,8 @@ export const SOURCES: Record<SourceField, SourceMeta> = {
     full: "Energie nucleară",
     color: "#84cc16", // lime-500
     fill: "rgba(132,204,22,0.6)",
-    kind: "renewable",
-    hint: "Centrala nuclearoelectrică Cernavodă",
+    kind: "lowcarbon", // nuclear NU e sursă regenerabilă — e low-carbon; exclus din RENEWABLE_FIELDS
+    hint: "Centrala nuclearoelectrică Cernavodă (cu emisii reduse de carbon, neregenerabilă)",
   },
   eolian: {
     field: "eolian",
@@ -99,8 +99,11 @@ export const SOURCE_ORDER: SourceField[] = [
   "foto",
 ];
 
-/** Câmpuri considerate regenerabile (ape + nuclear + eolian + foto + biomasă). */
-export const RENEWABLE_FIELDS: SourceField[] = ["ape", "nuclear", "eolian", "foto", "biomasa"];
+/**
+ * Câmpuri considerate regenerabile (RES). NOTĂ: nuclearul NU e regenerabil
+ * (e low-carbon) și e exclus intenționat din acest calcul — vezi SOURCES.nuclear.kind.
+ */
+export const RENEWABLE_FIELDS: SourceField[] = ["ape", "eolian", "foto", "biomasa"];
 
 /** Câmpuri considerate fosile (cărbune + hidrocarburi). */
 export const FOSSIL_FIELDS: SourceField[] = ["carbune", "hidrocarburi"];

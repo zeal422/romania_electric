@@ -2,7 +2,7 @@
 
 import type { TooltipProps } from "recharts";
 
-import { formatNumber } from "@/lib/sen/format";
+import { formatDateTime, formatNumber } from "@/lib/sen/format";
 
 interface Row {
   name: string;
@@ -66,18 +66,9 @@ export function ChartTooltip({ active, payload, label, labels, unit = "MW" }: Ch
 }
 
 function formatLabel(label: unknown): string {
-  if (typeof label === "string") {
-    // ISO timestamp?
-    if (/^\d{4}-\d{2}-\d{2}T/.test(label)) {
-      const d = new Date(label);
-      const ro = "ro-RO";
-      const month = d.toLocaleString(ro, { month: "short" }).replace(/\.$/, "");
-      const day = d.getDate();
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      return `${day} ${month}, ${hh}:${mm}`;
-    }
-    return label;
+  if (typeof label === "string" && /^\d{4}-\d{2}-\d{2}T/.test(label)) {
+    // ISO timestamp — reutilizăm formatDateTime (UTC, contract de timp).
+    return formatDateTime(label);
   }
   if (typeof label === "number") {
     return formatNumber(label);

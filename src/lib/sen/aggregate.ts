@@ -48,29 +48,41 @@ function r1(v: number): number {
  *
  * - "raw"/"10m": bucket de 10 minute, aliniat la minut multiplu de 10.
  * - "hour": începutul orei.
- * - "day": începutul zilei calendaristice (00:00 local).
+ * - "day": începutul zilei calendaristice (00:00).
+ *
+ * ATENȚIE (contract de timp): folosim Date.UTC + getters UTC. Datele sunt
+ * wall-clock românesc etichetat UTC, iar bucket-urile trebuie să fie identice
+ * pe ORICE fus orar (server). Getters locale ar muta granițele de zi/oră.
  */
 export function bucketKey(ts: number, granularity: Granularity): number {
   const d = new Date(ts);
   switch (granularity) {
     case "raw":
     case "10m": {
-      const minutes = d.getMinutes();
+      const minutes = d.getUTCMinutes();
       const bucketStartMin = Math.floor(minutes / 10) * 10;
-      return new Date(
-        d.getFullYear(),
-        d.getMonth(),
-        d.getDate(),
-        d.getHours(),
+      return Date.UTC(
+        d.getUTCFullYear(),
+        d.getUTCMonth(),
+        d.getUTCDate(),
+        d.getUTCHours(),
         bucketStartMin,
         0,
         0,
-      ).getTime();
+      );
     }
     case "hour":
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
+      return Date.UTC(
+        d.getUTCFullYear(),
+        d.getUTCMonth(),
+        d.getUTCDate(),
+        d.getUTCHours(),
+        0,
+        0,
+        0,
+      );
     case "day":
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
     default:
       return ts;
   }
@@ -93,9 +105,20 @@ export function aggregate(readings: SenReading[], granularity: Granularity): Agg
         t: r.t,
         ts: r.ts,
         count: 1,
+        consum: 0,
+        medieConsum: 0,
+        productie: 0,
+        carbune: 0,
+        hidrocarburi: 0,
+        ape: 0,
+        nuclear: 0,
+        eolian: 0,
+        foto: 0,
+        biomasa: 0,
+        sold: 0,
       };
       for (const f of FIELDS) {
-        (point[f] as number) = r1(r[f]);
+        point[f] = r1(r[f]);
       }
       return point;
     });
@@ -125,9 +148,20 @@ export function aggregate(readings: SenReading[], granularity: Granularity): Agg
       t: new Date(key).toISOString(),
       ts: key,
       count: b.count,
+      consum: 0,
+      medieConsum: 0,
+      productie: 0,
+      carbune: 0,
+      hidrocarburi: 0,
+      ape: 0,
+      nuclear: 0,
+      eolian: 0,
+      foto: 0,
+      biomasa: 0,
+      sold: 0,
     };
     for (const f of FIELDS) {
-      (point[f] as number) = r1(b.sums[f] / b.count);
+      point[f] = r1(b.sums[f] / b.count);
     }
     return point;
   });

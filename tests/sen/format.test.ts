@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  formatAxisTick,
+  formatDate,
   formatDateTime,
+  formatLastUpdatedLabel,
   formatMW,
   formatNumber,
   formatPercent,
@@ -99,12 +102,52 @@ describe("formatDateTime", () => {
     const out = formatDateTime(iso, { withYear: true });
     expect(out).toContain("2026");
   });
+
+  it("is independent of the system timezone (UTC getters)", () => {
+    // Contract de timp: cifrele din sursă (18:07) trebuie să apară identic
+    // indiferent de TZ-ul unde rulează testele (ex: EEST ar da 21:07 cu getters locale).
+    const iso = "2026-08-08T18:07:57.000Z";
+    expect(formatDateTime(iso)).toBe("8 aug, 18:07");
+    expect(formatDate(iso)).toBe("8 aug 2026");
+    expect(formatTime(iso)).toBe("18:07");
+  });
 });
 
 describe("formatTime", () => {
   it("formats HH:MM", () => {
     const iso = "2026-08-08T09:05:00.000Z";
     expect(formatTime(iso)).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe("formatAxisTick", () => {
+  const ts = Date.UTC(2026, 7, 8, 18, 7, 57); // 8 aug 2026, 18:07 UTC
+
+  it("day and hour show 'day month' with UTC getters", () => {
+    expect(formatAxisTick(ts, "day")).toBe("8 aug");
+    expect(formatAxisTick(ts, "hour")).toBe("8 aug");
+  });
+
+  it("raw and 10m show HH:MM", () => {
+    expect(formatAxisTick(ts, "raw")).toBe("18:07");
+    expect(formatAxisTick(ts, "10m")).toBe("18:07");
+  });
+
+  it("is independent of the system timezone", () => {
+    // Pe un sistem EEST, getters locale ar da 21:07 — nu și cu formatAxisTick (UTC).
+    expect(formatAxisTick(ts, "10m")).toBe("18:07");
+  });
+});
+
+describe("formatLastUpdatedLabel", () => {
+  it("uses feminine agreement with diacritics", () => {
+    expect(formatLastUpdatedLabel("acum 10 min")).toBe(
+      "Ultima înregistrare, actualizată acum 10 min",
+    );
+  });
+
+  it("returns the base label without trailing whitespace for empty relative", () => {
+    expect(formatLastUpdatedLabel("")).toBe("Ultima înregistrare, actualizată");
   });
 });
 

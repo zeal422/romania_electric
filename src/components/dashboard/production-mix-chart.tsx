@@ -14,7 +14,7 @@ import {
 
 import { ChartTooltip } from "./chart-tooltip";
 import { SOURCE_ORDER, SOURCES, SERIES_COLORS } from "@/lib/sen/constants";
-import { formatNumber } from "@/lib/sen/format";
+import { formatAxisTick, formatNumber } from "@/lib/sen/format";
 import type { AggregatedPoint, Granularity } from "@/lib/sen/types";
 
 interface ProductionMixChartProps {
@@ -36,7 +36,7 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
   }, []);
 
   const tickFormatter = useMemo(() => {
-    return (ts: number) => formatTick(ts, granularity);
+    return (ts: number) => formatAxisTick(ts, granularity);
   }, [granularity]);
 
   return (
@@ -98,24 +98,4 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
       </AreaChart>
     </ResponsiveContainer>
   );
-}
-
-/** Formatter axă X adaptat la granularitate. */
-function formatTick(ts: number, granularity: Granularity): string {
-  const d = new Date(ts);
-  const ro = "ro-RO";
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const month = d.toLocaleString(ro, { month: "short" }).replace(/\.$/, "");
-  const day = d.getDate();
-  switch (granularity) {
-    case "day":
-      return `${day} ${month}`;
-    case "hour":
-      return `${day} ${month}`;
-    case "10m":
-    case "raw":
-    default:
-      return `${hh}:${mm}`;
-  }
 }

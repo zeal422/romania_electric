@@ -73,10 +73,25 @@ describe("renewableShare", () => {
   });
 
   it("computes weighted renewable share across samples", () => {
-    // productie 1000, renewable (ape+nuclear+eolian+foto+biomasa) = 200+200+150+200+50 = 800
-    // -> 80%
+    // productie 1000, renewable (ape+eolian+foto+biomasa, FĂRĂ nuclear) = 200+150+200+50 = 600
+    // -> 60% (nuclearul NU e regenerabil și nu se numără)
     const r = makeReading(0);
-    expect(renewableShare([r])).toBe(80);
+    expect(renewableShare([r])).toBe(60);
+  });
+
+  it("does not count nuclear generation as renewable", () => {
+    // Doar nuclear + productie: share-ul regenerabil trebuie să fie 0.
+    const r = makeReading(0, {
+      productie: 1000,
+      carbune: 0,
+      hidrocarburi: 0,
+      ape: 0,
+      nuclear: 1000,
+      eolian: 0,
+      foto: 0,
+      biomasa: 0,
+    });
+    expect(renewableShare([r])).toBe(0);
   });
 
   it("averages correctly across multiple readings", () => {

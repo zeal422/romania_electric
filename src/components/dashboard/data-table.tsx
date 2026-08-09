@@ -16,14 +16,13 @@ import { formatDateTime, formatNumber, formatSigned } from "@/lib/sen/format";
 import type { SourceField } from "@/lib/sen/types";
 
 /** Tip minimal folosit de tabel — compatibil cu SenReading și AggregatedPoint. */
-interface TableRowLike {
+type TableRowLike = {
   t: string;
   ts: number;
   consum: number;
   productie: number;
   sold: number;
-  [k: SourceField]: number;
-}
+} & Record<SourceField, number>;
 
 interface DataTableProps {
   readings: TableRowLike[];

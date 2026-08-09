@@ -39,16 +39,14 @@ describe("mean", () => {
 });
 
 describe("bucketKey", () => {
-  const base = new Date(2026, 6, 8, 18, 7, 57).getTime(); // 8 iul 2026, 18:07:57
+  // Contract de timp: datele sunt wall-clock românesc etichetat UTC.
+  // Folosim Date.UTC peste tot ca testele să fie independente de TZ-ul mașinii.
+  const base = Date.UTC(2026, 6, 8, 18, 7, 57); // 8 iul 2026, 18:07:57
 
   it("aligns 10m bucket to nearest 10-minute boundary", () => {
-    expect(bucketKey(base, "10m")).toBe(new Date(2026, 6, 8, 18, 0, 0, 0).getTime());
-    expect(bucketKey(new Date(2026, 6, 8, 18, 24, 9).getTime(), "10m")).toBe(
-      new Date(2026, 6, 8, 18, 20, 0, 0).getTime(),
-    );
-    expect(bucketKey(new Date(2026, 6, 8, 18, 59, 0).getTime(), "10m")).toBe(
-      new Date(2026, 6, 8, 18, 50, 0, 0).getTime(),
-    );
+    expect(bucketKey(base, "10m")).toBe(Date.UTC(2026, 6, 8, 18, 0, 0));
+    expect(bucketKey(Date.UTC(2026, 6, 8, 18, 24, 9), "10m")).toBe(Date.UTC(2026, 6, 8, 18, 20, 0));
+    expect(bucketKey(Date.UTC(2026, 6, 8, 18, 59, 0), "10m")).toBe(Date.UTC(2026, 6, 8, 18, 50, 0));
   });
 
   it("raw behaves like 10m for bucketing", () => {
@@ -56,17 +54,21 @@ describe("bucketKey", () => {
   });
 
   it("hour bucket aligns to start of hour", () => {
-    expect(bucketKey(base, "hour")).toBe(new Date(2026, 6, 8, 18, 0, 0, 0).getTime());
-    expect(bucketKey(new Date(2026, 6, 8, 23, 59, 59).getTime(), "hour")).toBe(
-      new Date(2026, 6, 8, 23, 0, 0, 0).getTime(),
+    expect(bucketKey(base, "hour")).toBe(Date.UTC(2026, 6, 8, 18, 0, 0));
+    expect(bucketKey(Date.UTC(2026, 6, 8, 23, 59, 59), "hour")).toBe(
+      Date.UTC(2026, 6, 8, 23, 0, 0),
     );
   });
 
-  it("day bucket aligns to midnight", () => {
-    expect(bucketKey(base, "day")).toBe(new Date(2026, 6, 8, 0, 0, 0, 0).getTime());
-    expect(bucketKey(new Date(2026, 6, 8, 23, 59, 0).getTime(), "day")).toBe(
-      new Date(2026, 6, 8, 0, 0, 0, 0).getTime(),
-    );
+  it("day bucket aligns to UTC midnight", () => {
+    expect(bucketKey(base, "day")).toBe(Date.UTC(2026, 6, 8, 0, 0, 0));
+    expect(bucketKey(Date.UTC(2026, 6, 8, 23, 59, 0), "day")).toBe(Date.UTC(2026, 6, 8, 0, 0, 0));
+  });
+
+  it("is independent of the system timezone", () => {
+    // 18:07 UTC trebuie să rămână 18:07 UTC indiferent de TZ-ul unde rulează testele.
+    expect(bucketKey(base, "10m")).toBe(Date.UTC(2026, 6, 8, 18, 0, 0));
+    expect(bucketKey(base, "day")).toBe(Date.UTC(2026, 6, 8, 0, 0, 0));
   });
 });
 
@@ -88,10 +90,9 @@ describe("aggregate", () => {
   });
 
   it("groups 10m readings into 10-minute buckets with averaged fields", () => {
-    // Două înregistrări în același bucket de 10 min (18:07 și 18:12 -> bucket 18:00-18:10?
-    // 18:07 -> bucket 18:00, 18:12 -> bucket 18:10). Le punem în același bucket 18:00.
-    const t1 = new Date(2026, 6, 8, 18, 3, 0).getTime();
-    const t2 = new Date(2026, 6, 8, 18, 7, 0).getTime();
+    // Două înregistrări în același bucket de 10 min (18:03 și 18:07 -> bucket 18:00).
+    const t1 = Date.UTC(2026, 6, 8, 18, 3, 0);
+    const t2 = Date.UTC(2026, 6, 8, 18, 7, 0);
     const r1 = makeReading(t1, { consum: 4000, productie: 3000 });
     const r2 = makeReading(t2, { consum: 6000, productie: 5000 });
     const result = aggregate([r1, r2], "10m");
@@ -99,11 +100,11 @@ describe("aggregate", () => {
     expect(result[0].count).toBe(2);
     expect(result[0].consum).toBe(5000); // (4000+6000)/2
     expect(result[0].productie).toBe(4000); // (3000+5000)/2
-    expect(result[0].ts).toBe(new Date(2026, 6, 8, 18, 0, 0, 0).getTime());
+    expect(result[0].ts).toBe(Date.UTC(2026, 6, 8, 18, 0, 0));
   });
 
   it("hourly aggregates average across the whole hour", () => {
-    const hour = new Date(2026, 6, 8, 14).getTime();
+    const hour = Date.UTC(2026, 6, 8, 14, 0, 0);
     const readings = [
       makeReading(hour + 0, { consum: 3000 }),
       makeReading(hour + 5 * 60_000, { consum: 4000 }),
@@ -117,7 +118,7 @@ describe("aggregate", () => {
   });
 
   it("daily aggregates across multiple hours into one bucket", () => {
-    const day = new Date(2026, 6, 8, 0).getTime();
+    const day = Date.UTC(2026, 6, 8, 0, 0, 0);
     const readings = [
       makeReading(day + 0, { consum: 2000 }),
       makeReading(day + 6 * 3_600_000, { consum: 4000 }),
@@ -130,16 +131,16 @@ describe("aggregate", () => {
   });
 
   it("sorts output by timestamp ascending even if input is unsorted", () => {
-    const t1 = new Date(2026, 6, 8, 10, 0).getTime();
-    const t2 = new Date(2026, 6, 8, 12, 0).getTime();
+    const t1 = Date.UTC(2026, 6, 8, 10, 0, 0);
+    const t2 = Date.UTC(2026, 6, 8, 12, 0, 0);
     const result = aggregate([makeReading(t2), makeReading(t1)], "hour");
     expect(result[0].ts).toBe(t1);
     expect(result[1].ts).toBe(t2);
   });
 
   it("rounds aggregated values to one decimal", () => {
-    const t1 = new Date(2026, 6, 8, 18, 3).getTime();
-    const t2 = new Date(2026, 6, 8, 18, 7).getTime();
+    const t1 = Date.UTC(2026, 6, 8, 18, 3, 0);
+    const t2 = Date.UTC(2026, 6, 8, 18, 7, 0);
     const r1 = makeReading(t1, { consum: 4001 });
     const r2 = makeReading(t2, { consum: 4002 });
     const result = aggregate([r1, r2], "10m");
@@ -149,7 +150,7 @@ describe("aggregate", () => {
 });
 
 describe("filterByRange", () => {
-  const base = new Date(2026, 6, 8, 12, 0).getTime();
+  const base = Date.UTC(2026, 6, 8, 12, 0, 0);
   const readings = [
     makeReading(base - 2 * 3_600_000),
     makeReading(base - 3_600_000),
@@ -206,7 +207,7 @@ describe("downsample", () => {
 
 describe("aggregate granularity parity", () => {
   it("all granularities produce valid AggregatedPoint shape", () => {
-    const readings = [makeReading(new Date(2026, 6, 8, 12, 5).getTime())];
+    const readings = [makeReading(Date.UTC(2026, 6, 8, 12, 5, 0))];
     const granularities: Granularity[] = ["raw", "10m", "hour", "day"];
     for (const g of granularities) {
       const result = aggregate(readings, g);

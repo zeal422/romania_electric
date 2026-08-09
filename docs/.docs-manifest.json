@@ -1,0 +1,122 @@
+{
+  "docs/00-index.md": {
+    "covers": {}
+  },
+  "docs/01-arhitectura.md": {
+    "covers": {
+      "src/app/page.tsx": "e3e899706e88fdcfad9e4f8ce541fab89b9c60402ffcfea3920e09fd075b264a",
+      "src/app/layout.tsx": "e9847fb7f663ae3cf8ee66bd856dddefa0db7cf2d197739887d3c26dfcafbc97",
+      "src/components/providers.tsx": "7330d5361692de2a634eb771414e57324c21bf5de786e94b99b24ae9daa7e724",
+      "src/lib/sen/index.ts": "a03967937faa152f560833300469defbba70b957ca5e4a80e7d27f3f2f3f4e12",
+      "src/lib/utils.ts": "d1f1e0d62cb8d8d1e04c26e14de842d8a151f75812d81b046c65b5d1fe8e4b27",
+      "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
+      "package.json": "589e72d5c7a0e216ba035ceb8cac649e4af7ed7aa40fc7554e5fd25f6631c8b4"
+    }
+  },
+  "docs/02-pipeline-date.md": {
+    "covers": {
+      "scripts/convert-sen.py": "1c3e0af739d1bb28e3dbfb078d0b9d8d72c6ddb7aaccf81408a18ac1f90ef6b4",
+      "src/lib/sen/loader.ts": "3dc03f27130170651d0a18b1c625ef113e8100a900e419626f1804dee644f40a",
+      "src/lib/sen/types.ts": "b0aa91127615e44d8c03604949244a35541fdc9320f48f4a5a15694353b99c34"
+    }
+  },
+  "docs/03-api.md": {
+    "covers": {
+      "src/app/api/sen/route.ts": "f3aa0f4190913119cb9e632d7cb40b1db74ff7e07576c0d4a0fd4fe24f108b27",
+      "src/app/api/sen/summary/route.ts": "08e9ba8d8f7d92d114476830dda8bd37908e78a4725e566249bc6102a4313bbb",
+      "src/app/api/sen/export/route.ts": "eccb5d67f1a57116694b0be72c464c1c919731ba112406c5f4d17b1bcd97b2d6",
+      "src/hooks/use-sen-data.ts": "d7253dbe5677c7c3ec329667e4d5eaf67a93c715c57f1ec5d4184dacc2f70667",
+      "src/components/dashboard/filters.tsx": "d3f7f1af1f665b08e08844b94c7a385189ce24ebde19841dc017193f6e760ae2",
+      "src/lib/sen/types.ts": "b0aa91127615e44d8c03604949244a35541fdc9320f48f4a5a15694353b99c34"
+    }
+  },
+  "docs/04-strat-date.md": {
+    "covers": {
+      "src/lib/sen/types.ts": "b0aa91127615e44d8c03604949244a35541fdc9320f48f4a5a15694353b99c34",
+      "src/lib/sen/constants.ts": "62d4d13df0d1b328ba90e74bf78eb6ecfc98115939f84ca5ebade0f68eac9768",
+      "src/lib/sen/aggregate.ts": "741ac40a951911748c868a12878eecf992fada6c68316a6dc89e4b9301cd7f84",
+      "src/lib/sen/stats.ts": "d909d92deee07e85f2c87b495c518440a0399d30dc6d4f10a7b6757bff120649",
+      "src/lib/sen/format.ts": "4edd68dfe2cc86b2438c6e08f5e00ac422c8efc8059444abcc8e4d8f0f5c1870",
+      "src/lib/sen/loader.ts": "3dc03f27130170651d0a18b1c625ef113e8100a900e419626f1804dee644f40a",
+      "src/lib/sen/index.ts": "a03967937faa152f560833300469defbba70b957ca5e4a80e7d27f3f2f3f4e12"
+    }
+  },
+  "docs/05-ui-dashboard.md": {
+    "covers": {
+      "src/app/page.tsx": "e3e899706e88fdcfad9e4f8ce541fab89b9c60402ffcfea3920e09fd075b264a",
+      "src/components/dashboard/header.tsx": "4d2f4aa93048b43a32c4ca17533a820abbc133dc0f9e9fbc7e34a31ff0065b97",
+      "src/components/dashboard/filters.tsx": "d3f7f1af1f665b08e08844b94c7a385189ce24ebde19841dc017193f6e760ae2",
+      "src/components/dashboard/kpi-cards.tsx": "7cc17d9b310a918ce2c41bd53b38f846222154a07fda4c55d6db8fd59b6a18d6",
+      "src/components/dashboard/production-mix-chart.tsx": "3b79639297efd5b38584030f6087fd06c28b183416822367b4a39a857a3ea2d2",
+      "src/components/dashboard/source-distribution.tsx": "f64a14fd72dada378e1f9240deb3ac515121cacec0b731dcbfec4d87d2fb2a92",
+      "src/components/dashboard/demand-supply-chart.tsx": "da866701e022c19494865b259685be683309e805c9d2e30f5bb7bf1c118e8174",
+      "src/components/dashboard/balance-chart.tsx": "bf96f78fe4b1e510e60c80c488bdeda4edceba5bd953c3b3516131b28193826c",
+      "src/components/dashboard/data-table.tsx": "7314a64b2638288e8c090c4141ddc15d3dba3815104b02b4149f7eb7f8d793f7",
+      "src/components/dashboard/section-card.tsx": "b6681f84681e94a771eb8414d1c63de001f98601099808cc0e5067073f12df86",
+      "src/components/dashboard/chart-tooltip.tsx": "57ca045a9322d3ec757680d7f39faed11be05b20968a55fcdcd396df2481e73a",
+      "src/components/dashboard/theme-toggle.tsx": "f1ff1e7b3df7e459cff79a519309f5d03a0d2adffe2fd7eab8bacd1f2237877b",
+      "src/components/dashboard/footer.tsx": "dacece63d5bb122d80e9cadd9dbc604c57112d57b7298083a1ef7e4f7c2764b1",
+      "src/hooks/use-mounted.ts": "4dba989949245349e8edc8eaee3c884007a88e2bf9a9a1fcce69f7e1d4b827cd"
+    }
+  },
+  "docs/06-design.md": {
+    "covers": {
+      "src/app/globals.css": "5b76b1109550b3851af7923eb82498a5fab87bec6c1ce4106377358e84d54e5b",
+      "tailwind.config.ts": "ade682235e52f45b1c1dfc020f0bdb9f27b94fcff60afaa3272fae22fe5c0c54",
+      "src/lib/sen/constants.ts": "62d4d13df0d1b328ba90e74bf78eb6ecfc98115939f84ca5ebade0f68eac9768",
+      "src/app/layout.tsx": "e9847fb7f663ae3cf8ee66bd856dddefa0db7cf2d197739887d3c26dfcafbc97"
+    }
+  },
+  "docs/07-testing-ci.md": {
+    "covers": {
+      "package.json": "589e72d5c7a0e216ba035ceb8cac649e4af7ed7aa40fc7554e5fd25f6631c8b4",
+      "scripts/check-hydration.sh": "4cd8ec4a837765ccf3ebf69d7773a675c2a10c4f144c844ec1f0f12b18bb40c1",
+      "scripts/check-docs-stale.sh": "3bbb52e1c2392c29406f32f875f32d291c2132f0da349259a67fa337e2deaca2",
+      "scripts/mark-docs-verified.sh": "b2ad1538c3c69627ce8d3612fc51f678d45367d55ccddf76193f4a816ad7973f",
+      "tests/sen/aggregate.test.ts": "863aab686628c03c4c44a1a29d84fdaa39fc77a02995e89f2a9d4b04207138ee",
+      "tests/sen/stats.test.ts": "3790a78aa609a01b9d765fb40baaf46e3d8759848edfda45d342a9f4545079d3",
+      "tests/sen/format.test.ts": "9c7b939d1f1d7b2130a56e2c5c2819b46e1a1c8007ab31016b2c25f0337f0552"
+    }
+  },
+  "docs/08-harta-cautare.md": {
+    "covers": {
+      "src/app/page.tsx": "e3e899706e88fdcfad9e4f8ce541fab89b9c60402ffcfea3920e09fd075b264a",
+      "src/app/layout.tsx": "e9847fb7f663ae3cf8ee66bd856dddefa0db7cf2d197739887d3c26dfcafbc97",
+      "src/components/providers.tsx": "7330d5361692de2a634eb771414e57324c21bf5de786e94b99b24ae9daa7e724",
+      "src/components/dashboard/header.tsx": "4d2f4aa93048b43a32c4ca17533a820abbc133dc0f9e9fbc7e34a31ff0065b97",
+      "src/components/dashboard/filters.tsx": "d3f7f1af1f665b08e08844b94c7a385189ce24ebde19841dc017193f6e760ae2",
+      "src/components/dashboard/kpi-cards.tsx": "7cc17d9b310a918ce2c41bd53b38f846222154a07fda4c55d6db8fd59b6a18d6",
+      "src/components/dashboard/production-mix-chart.tsx": "3b79639297efd5b38584030f6087fd06c28b183416822367b4a39a857a3ea2d2",
+      "src/components/dashboard/source-distribution.tsx": "f64a14fd72dada378e1f9240deb3ac515121cacec0b731dcbfec4d87d2fb2a92",
+      "src/components/dashboard/demand-supply-chart.tsx": "da866701e022c19494865b259685be683309e805c9d2e30f5bb7bf1c118e8174",
+      "src/components/dashboard/balance-chart.tsx": "bf96f78fe4b1e510e60c80c488bdeda4edceba5bd953c3b3516131b28193826c",
+      "src/components/dashboard/data-table.tsx": "7314a64b2638288e8c090c4141ddc15d3dba3815104b02b4149f7eb7f8d793f7",
+      "src/components/dashboard/section-card.tsx": "b6681f84681e94a771eb8414d1c63de001f98601099808cc0e5067073f12df86",
+      "src/components/dashboard/chart-tooltip.tsx": "57ca045a9322d3ec757680d7f39faed11be05b20968a55fcdcd396df2481e73a",
+      "src/components/dashboard/theme-toggle.tsx": "f1ff1e7b3df7e459cff79a519309f5d03a0d2adffe2fd7eab8bacd1f2237877b",
+      "src/components/dashboard/footer.tsx": "dacece63d5bb122d80e9cadd9dbc604c57112d57b7298083a1ef7e4f7c2764b1",
+      "src/hooks/use-sen-data.ts": "d7253dbe5677c7c3ec329667e4d5eaf67a93c715c57f1ec5d4184dacc2f70667",
+      "src/hooks/use-mounted.ts": "4dba989949245349e8edc8eaee3c884007a88e2bf9a9a1fcce69f7e1d4b827cd",
+      "src/lib/sen/types.ts": "b0aa91127615e44d8c03604949244a35541fdc9320f48f4a5a15694353b99c34",
+      "src/lib/sen/constants.ts": "62d4d13df0d1b328ba90e74bf78eb6ecfc98115939f84ca5ebade0f68eac9768",
+      "src/lib/sen/aggregate.ts": "741ac40a951911748c868a12878eecf992fada6c68316a6dc89e4b9301cd7f84",
+      "src/lib/sen/stats.ts": "d909d92deee07e85f2c87b495c518440a0399d30dc6d4f10a7b6757bff120649",
+      "src/lib/sen/format.ts": "4edd68dfe2cc86b2438c6e08f5e00ac422c8efc8059444abcc8e4d8f0f5c1870",
+      "src/lib/sen/loader.ts": "3dc03f27130170651d0a18b1c625ef113e8100a900e419626f1804dee644f40a",
+      "src/lib/sen/index.ts": "a03967937faa152f560833300469defbba70b957ca5e4a80e7d27f3f2f3f4e12",
+      "src/lib/utils.ts": "d1f1e0d62cb8d8d1e04c26e14de842d8a151f75812d81b046c65b5d1fe8e4b27",
+      "src/app/api/sen/route.ts": "f3aa0f4190913119cb9e632d7cb40b1db74ff7e07576c0d4a0fd4fe24f108b27",
+      "src/app/api/sen/summary/route.ts": "08e9ba8d8f7d92d114476830dda8bd37908e78a4725e566249bc6102a4313bbb",
+      "src/app/api/sen/export/route.ts": "eccb5d67f1a57116694b0be72c464c1c919731ba112406c5f4d17b1bcd97b2d6",
+      "src/app/globals.css": "5b76b1109550b3851af7923eb82498a5fab87bec6c1ce4106377358e84d54e5b",
+      "tailwind.config.ts": "ade682235e52f45b1c1dfc020f0bdb9f27b94fcff60afaa3272fae22fe5c0c54",
+      "scripts/convert-sen.py": "1c3e0af739d1bb28e3dbfb078d0b9d8d72c6ddb7aaccf81408a18ac1f90ef6b4",
+      "scripts/check-hydration.sh": "4cd8ec4a837765ccf3ebf69d7773a675c2a10c4f144c844ec1f0f12b18bb40c1",
+      "tests/sen/aggregate.test.ts": "863aab686628c03c4c44a1a29d84fdaa39fc77a02995e89f2a9d4b04207138ee",
+      "tests/sen/stats.test.ts": "3790a78aa609a01b9d765fb40baaf46e3d8759848edfda45d342a9f4545079d3",
+      "tests/sen/format.test.ts": "9c7b939d1f1d7b2130a56e2c5c2819b46e1a1c8007ab31016b2c25f0337f0552",
+      "package.json": "589e72d5c7a0e216ba035ceb8cac649e4af7ed7aa40fc7554e5fd25f6631c8b4",
+      "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75"
+    }
+  }
+}

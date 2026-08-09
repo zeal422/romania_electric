@@ -13,7 +13,7 @@ import {
 
 import { ChartTooltip } from "./chart-tooltip";
 import { SERIES_COLORS } from "@/lib/sen/constants";
-import { formatNumber } from "@/lib/sen/format";
+import { formatAxisTick, formatNumber } from "@/lib/sen/format";
 import type { AggregatedPoint, Granularity } from "@/lib/sen/types";
 
 interface DemandSupplyChartProps {
@@ -31,7 +31,7 @@ export function DemandSupplyChart({ points, granularity }: DemandSupplyChartProp
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
         <XAxis
           dataKey="ts"
-          tickFormatter={(ts) => formatTick(ts, granularity)}
+          tickFormatter={(ts) => formatAxisTick(ts as number, granularity)}
           tickLine={false}
           axisLine={false}
           minTickGap={48}
@@ -67,21 +67,4 @@ export function DemandSupplyChart({ points, granularity }: DemandSupplyChartProp
       </LineChart>
     </ResponsiveContainer>
   );
-}
-
-function formatTick(ts: number, granularity: Granularity): string {
-  const d = new Date(ts);
-  const ro = "ro-RO";
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const month = d.toLocaleString(ro, { month: "short" }).replace(/\.$/, "");
-  const day = d.getDate();
-  switch (granularity) {
-    case "day":
-      return `${day} ${month}`;
-    case "hour":
-      return `${day} ${month}`;
-    default:
-      return `${hh}:${mm}`;
-  }
 }

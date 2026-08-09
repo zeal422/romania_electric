@@ -4,10 +4,6 @@ out
 build
 bun.lock
 next-env.d.ts
-examples
-skills
-download
 upload
 data
-prisma/migrations
 *.log

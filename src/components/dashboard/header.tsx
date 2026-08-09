@@ -4,7 +4,7 @@ import { Activity, Zap } from "lucide-react";
 
 import { ThemeToggle } from "./theme-toggle";
 import { Badge } from "@/components/ui/badge";
-import { formatDateTime, formatRelative } from "@/lib/sen/format";
+import { formatDateTime, formatLastUpdatedLabel, formatRelative } from "@/lib/sen/format";
 import type { SenSummaryResponse } from "@/lib/sen/types";
 
 interface HeaderProps {
@@ -57,7 +57,9 @@ export function Header({ summary }: HeaderProps) {
           {latestIso && (
             <Badge
               variant="secondary"
+              role="status"
               className="hidden gap-1.5 bg-primary/10 text-primary sm:flex"
+              aria-label={formatLastUpdatedLabel(relative ?? "")}
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />

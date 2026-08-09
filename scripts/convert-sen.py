@@ -126,8 +126,10 @@ def main():
         "sources": SOURCES,
     }
 
+    # Nuclearul NU e o sursă regenerabilă (e low-carbon) — exclus intenționat din RES.
+    RENEWABLE = ["ape", "eolian", "foto", "biomasa"]
     avg_prod = mean(col("productie"))
-    avg_renew = mean([sum(r[s] for s in ["ape", "nuclear", "eolian", "foto", "biomasa"]) for r in records])
+    avg_renew = mean([sum(r[s] for s in RENEWABLE) for r in records])
     summary["renewableShareAvg"] = round(100 * avg_renew / avg_prod, 1) if avg_prod else 0
 
     solds = col("sold")
