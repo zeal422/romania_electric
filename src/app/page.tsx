@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { BalanceChart } from "@/components/dashboard/balance-chart";
 import { DataTable } from "@/components/dashboard/data-table";
@@ -15,29 +15,58 @@ import { SectionCard } from "@/components/dashboard/section-card";
 import { SourceDistribution } from "@/components/dashboard/source-distribution";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocalPreference } from "@/hooks/use-local-preference";
 import { useSenData, useSenSummary } from "@/hooks/use-sen-data";
 import { SOURCE_ORDER, SOURCES } from "@/lib/sen/constants";
-import type { Granularity } from "@/lib/sen/types";
+import { GRANULARITIES, granularitiesForPreset, type Granularity } from "@/lib/sen/types";
+
+const PRESET_IDS = RANGE_PRESETS.map((p) => p.id);
+
+// Validatori stabili la nivel de modul: `isValid` trebuie să fie aceeași
+// referință între randări ca `getSnapshot` (useCallback) să nu se recreeze
+// inutil la fiecare render.
+const isPresetId = (v: string): v is string => PRESET_IDS.includes(v);
+
+function isGranularity(v: string): v is Granularity {
+  return (GRANULARITIES as string[]).includes(v);
+}
 
 export default function Home() {
   const summaryQuery = useSenSummary();
   const summary = summaryQuery.data;
 
-  const [activePreset, setActivePreset] = useState<string>("7d");
-  const [granularity, setGranularity] = useState<Granularity>("hour");
+  // Preferințele de filtrare persistă în localStorage (revine la ele la refresh).
+  const [activePreset, setActivePreset] = useLocalPreference<string>(
+    "sen:preset",
+    "7d",
+    isPresetId,
+  );
+  const [granularity, setGranularity] = useLocalPreference<Granularity>(
+    "sen:granularity",
+    "hour",
+    isGranularity,
+  );
 
   const endTs = summary?.endTs ?? 0;
   const startTs = summary?.startTs ?? 0;
+
+  /** Ajustează granularitatea la o valoare compatibilă cu preset-ul (persistată). */
+  function resolveGranularity(preset: string, g: Granularity): Granularity {
+    // Sursă unică cu `Filters` (care dezactivează opțiunile incompatibile).
+    return granularitiesForPreset(preset).includes(g) ? g : "hour";
+  }
+
+  // Normalizează perechea preset/granularitate imediat după citirea preferințelor:
+  // localStorage poate conține o pereche incompatibilă (ex: 24h + day stocată
+  // înainte de existența protecției), așa că aplicăm aceeași regulă ca la
+  // schimbarea preset-ului și o folosim pentru query + grafice + UI.
+  const effectiveGranularity = resolveGranularity(activePreset, granularity);
 
   /** Schimbă preset-ul de interval, ajustând granularitatea dacă e incompatibilă. */
   function handlePresetChange(preset: string) {
     setActivePreset(preset);
     // 24h e prea scurt pentru zi; interval mare e prea dens pentru raw/10m
-    setGranularity((g) => {
-      if (preset === "24h" && g === "day") return "hour";
-      if ((preset === "30d" || preset === "all") && (g === "raw" || g === "10m")) return "hour";
-      return g;
-    });
+    setGranularity(resolveGranularity(preset, granularity));
   }
 
   const { from, to } = useMemo(() => {
@@ -47,7 +76,7 @@ export default function Home() {
     return { from: fromTs, to: endTs };
   }, [activePreset, endTs, startTs]);
 
-  const dataQuery = useSenData(from || undefined, to || undefined, granularity);
+  const dataQuery = useSenData(from || undefined, to || undefined, effectiveGranularity);
   const points = dataQuery.data?.points ?? [];
 
   const renewableShare = dataQuery.data?.summary.renewableShareAvg;
@@ -70,7 +99,7 @@ export default function Home() {
               endTs={endTs}
               startTs={startTs}
               activePreset={activePreset}
-              granularity={granularity}
+              granularity={effectiveGranularity}
               onPresetChange={handlePresetChange}
               onGranularityChange={setGranularity}
               from={from}
@@ -105,7 +134,7 @@ export default function Home() {
             ) : dataQuery.error ? (
               <ChartError />
             ) : (
-              <ProductionMixChart points={points} granularity={granularity} />
+              <ProductionMixChart points={points} granularity={effectiveGranularity} />
             )}
           </SectionCard>
 
@@ -148,7 +177,7 @@ export default function Home() {
             ) : dataQuery.error ? (
               <ChartError />
             ) : (
-              <DemandSupplyChart points={points} granularity={granularity} />
+              <DemandSupplyChart points={points} granularity={effectiveGranularity} />
             )}
           </SectionCard>
 
@@ -162,7 +191,7 @@ export default function Home() {
             ) : dataQuery.error ? (
               <ChartError />
             ) : (
-              <BalanceChart points={points} granularity={granularity} />
+              <BalanceChart points={points} granularity={effectiveGranularity} />
             )}
           </SectionCard>
         </div>

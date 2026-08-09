@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { granularityLabel } from "@/lib/sen/format";
-import type { Granularity } from "@/lib/sen/types";
+import { GRANULARITIES, granularitiesForPreset, type Granularity } from "@/lib/sen/types";
 import { cn } from "@/lib/utils";
 
 export interface RangePreset {
@@ -28,8 +28,6 @@ export const RANGE_PRESETS: RangePreset[] = [
   { id: "30d", label: "30 zile", msBack: 30 * 24 * 3_600_000 },
   { id: "all", label: "Tot intervalul", msBack: null },
 ];
-
-const GRANULARITIES: Granularity[] = ["raw", "10m", "hour", "day"];
 
 interface FiltersProps {
   endTs: number;
@@ -58,6 +56,8 @@ export function Filters({
   from,
   to,
 }: FiltersProps) {
+  const availableGranularities = granularitiesForPreset(activePreset);
+
   function handleExport() {
     const params = new URLSearchParams({
       from: String(from),
@@ -100,7 +100,12 @@ export function Filters({
         </SelectTrigger>
         <SelectContent>
           {GRANULARITIES.map((g) => (
-            <SelectItem key={g} value={g} className="text-xs">
+            <SelectItem
+              key={g}
+              value={g}
+              className="text-xs"
+              disabled={!availableGranularities.includes(g)}
+            >
               {granularityLabel(g)}
             </SelectItem>
           ))}

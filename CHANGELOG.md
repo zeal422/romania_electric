@@ -6,6 +6,22 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.4] — 2026-08-09, 17:23 EEST
+
+### Adăugat
+
+- **Preferințele de filtrare persistă în localStorage**: hook nou `useLocalPreference` (`src/hooks/use-local-preference.ts`, bazat pe `useSyncExternalStore` — fără hydration mismatch) salvează preset-ul de interval și granularitatea; revin la ele la refresh, nu la valori implicite. Logica de citire/scriere e în funcții pure `src/lib/local-preference.ts` (storage injectat, protecție la excepții, validare la citire) — testate fără DOM.
+- **`GRANULARITIES` + `granularitiesForPreset`** (`src/lib/sen/types.ts`): sursă unică pentru lista de granularități și pentru regula de compatibilitate preset→granularitate (24h fără `day`; 30d/all fără `raw`/`10m`; restul = toate). Mutat din `filters.tsx` (unde era duplicat) ca logica pură să fie testabilă fără import de component client.
+- **11 teste unitare noi** (`tests/local-preference.test.ts`): `readLocalPreference`/`writeLocalPreference` (fallback la `null`/excepție/`isValid` eșuat, string brut fără JSON, succes/eșec fără throw) + `granularitiesForPreset` (24h, 30d, all, preset-uri libere). Total: **101 teste unitare**.
+
+### Reparat
+
+- **🔴 Fundal alb pe dark mode (Tailwind v4)**: clasele custom `bg-aura-*` erau definite în `@layer utilities`, unde variantele (`dark:`) **nu se generează** în Tailwind v4 — pe dark mode rămânea activ doar fundalul light (alb). Mutate în directiva `@utility` și verificat în CSS-ul compilat că `.dark\:bg-aura-dark:is(.dark *)` se generează corect (charcoal adânc).
+- **Fundal „control room" profesional**: înlocuite radial-gradients-urile (pete circulare vizibile, aspect amator) cu un `linear-gradient` vertical cu contrast foarte mic (adâncime subtilă „lumină de sus") + granulație fină grayscale anti-banding.
+- **Perechea preset/granularitate incompatibilă stocată în localStorage** (ex: `24h`+`day` salvată înainte de protecție) ajungea în query-ul de date: acum e normalizată la citire (`effectiveGranularity` în `page.tsx`, folosită pentru query, grafice și UI), iar dropdown-ul de granularitate **dezactivează** opțiunile incompatibile cu preset-ul activ.
+- **`.gitignore`**: pattern-ul `local-*` ignora accidental fișiere reale de cod (`src/lib/local-preference.ts`, `tests/local-preference.test.ts`) — adăugate excepții explicite; fără ele commit-ul ar fi rupt app-ul (importul lanțului de preferințe) și ar fi pierdut testele.
+- **Documentație**: AGENTS.md §4.10 + docs/07 — pornirea serverului cere **întotdeauna** aprobare explicită (fără excepție activ/inactiv); probele curl clasifică exit status (`7` = refuz/port liber vs `28` = timeout/stare necunoscută); curățarea folosește fișiere metadata unice per rulare + **verificarea identității PID** înainte de `kill` (nu ucide niciodată un proces străin/reutilizat). Docs 05/06/07/08 + manifest aduse la zi cu codul (tabele corectate, regula de teste clarificată: „contează acoperirea, nu directorul fizic").
+
 ## [0.3.3] — 2026-08-09, 10:45 EEST
 
 ### Reparat

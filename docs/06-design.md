@@ -28,12 +28,17 @@ Variabilele sunt expuse ca token-uri Tailwind prin `@theme inline` (`--color-bac
 
 - Folosește **întotdeauna** variabilele Tailwind/semantice (`bg-card`, `text-muted-foreground`, `border-border`) — nu hex/oklch hardcodate pentru fundaluri și text.
 - Singura excepție: culorile **seriilor de date** (hex în `constants.ts`, vezi mai jos) — astea sunt identice în ambele temi intenționat.
-- Stiluri globale live în `@layer base` (body, scrollbar) și `@layer utilities` (`bg-aura-dark`/`bg-aura-light`, `.tnum`).
+- Stiluri globale live în `@layer base` (body, scrollbar) și `@layer utilities` (`.tnum`). Clasele de fundal `bg-aura-dark`/`bg-aura-light` sunt înregistrate cu **`@utility`** (NU în `@layer utilities`) — obligatoriu în Tailwind v4 ca variantele (`dark:`) să se genereze.
 
-## Fundal „aura"
+## Fundal „aura" (linear subtil)
 
-- `page.tsx` folosește `bg-aura-light dark:bg-aura-dark` — un gradient radial subtil în partea de sus, în locul unei grile (grila crea moiré/artefacte — a fost eliminată intenționat).
-- Dark: aură rece charcoal; Light: aură verde-discret.
+- `page.tsx` folosește `bg-aura-light dark:bg-aura-dark` — **fără radial-gradients**: doar un `linear-gradient` vertical cu contrast foarte mic (adâncime subtilă „lumină de sus", uniform pe toată lățimea) + granulație fină SVG anti-banding.
+- Dark: charcoal aproape plat, top puțin mai deschis (`oklch(0.165 …)` → `oklch(0.149 …)`); Light: alb cald, top mai deschis (`oklch(0.99 …)` → `oklch(0.976 …)`).
+- Structura (în `globals.css`, cu `@utility` — **obligatoriu** pentru ca `dark:` să funcționeze în Tailwind v4; fără `@utility` variantele nu se generează și dark mode rămâne cu fundal light):
+  - `linear-gradient(180deg, …)` — un singur gradient vertical, **fără pete circulare** (radial-gradients creează „blob"-uri vizibile care arată amator — evitați-le).
+  - `url("data:image/svg+xml,…feTurbulence…fractalNoise…opacity='0.035'")` — **granulație fină** anti-banding (zgomot subtil, ~3.5% opacitate dark / 1.5% light).
+- `background-attachment: fixed` — textura rămâne pe loc la scroll.
+- **Regulă de design:** NU folosi radial-gradients pe fundal (nici măcar difuze) — un linear-gradient vertical cu contrast mic + granulație fină e aspectul profesional standard pentru dashboards. Dacă simți nevoia de accent de culoare, pune-l în carduri/grafice, nu pe fundal.
 
 ## Culorile surselor — `src/lib/sen/constants.ts`
 

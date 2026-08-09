@@ -42,6 +42,24 @@ export type SourceField = (typeof SOURCE_FIELDS)[number];
 /** Granularitatea de agregare cerută prin API. */
 export type Granularity = "raw" | "10m" | "hour" | "day";
 
+/** Lista canonică a granularităților (single source of truth pentru UI + validare). */
+export const GRANULARITIES: Granularity[] = ["raw", "10m", "hour", "day"];
+
+/**
+ * Granularitățile compatibile cu un preset de interval (sursă unică pentru UI
+ * și pentru normalizarea din page.tsx). Regula: 24h e prea scurt pentru `day`;
+ * 30d/all e prea dens pentru `raw`/`10m`. Trăiește lângă `GRANULARITIES` (nu
+ * în filters.tsx) ca logica pură să fie testabilă fără a importa un component
+ * client. Depinde doar de string-urile de preset, nu de RANGE_PRESETS.
+ */
+export function granularitiesForPreset(preset: string): Granularity[] {
+  if (preset === "24h") return GRANULARITIES.filter((g) => g !== "day");
+  if (preset === "30d" || preset === "all") {
+    return GRANULARITIES.filter((g) => g !== "raw" && g !== "10m");
+  }
+  return GRANULARITIES;
+}
+
 /** Un punct agregat pe un bucket de timp. */
 export interface AggregatedPoint {
   /** ISO timestamp la începutul bucket-ului. */

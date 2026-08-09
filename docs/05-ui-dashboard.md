@@ -23,17 +23,17 @@ Footer (sticky bottom)
 
 **Starea din `page.tsx`:**
 
-- `activePreset` (default `"7d"`) și `granularity` (default `"hour"`).
+- `activePreset` (default `"7d"`) și `granularity` (default `"hour"`) — **persistă în localStorage** prin `useLocalPreference` (`src/hooks/use-local-preference.ts`), deci supraviețuiesc refresh-ului.
 - `from`/`to` calculate din preset relativ la `summary.endTs` (nu `now()`).
-- La schimbarea preset-ului se ajustează automat granularitatea dacă e incompatibilă (ex: `24h` + `day` → `hour`).
+- Perechea preset/granularitate e **normalizată și la citirea preferințelor** (nu doar la schimbarea preset-ului): `effectiveGranularity = resolveGranularity(activePreset, granularity)` e folosită pentru query, grafice și UI, ca o pereche incompatibilă stocată anterior (ex: `24h` + `day`) să nu ajungă în `useSenData`.
+- Regula de compatibilitate preset→granularitate e **sursă unică** în `granularitiesForPreset(preset)` (exportat din `src/lib/sen/types.ts`, lângă `GRANULARITIES` — logica pură, testată separat): `Filters` **dezactivează** opțiunile incompatibile în dropdown (24h → fără `day`; 30d/all → fără `raw`/`10m`), iar `resolveGranularity` din `page.tsx` folosește aceeași funcție → UI-ul nu mai permite o pereche incompatibilă, iar dacă una veche e stocată, e normalizată la citire.
 - Stări de loading/error pentru KPI și grafice (skeleton + alert).
 
 ## Componentele din `src/components/dashboard/`
 
 | Componentă           | Fișier                     | Rol                                                                                                                                                                                                       |
 | -------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Header`             | `header.tsx`               | Antet sticky: titlu, link Transelectrica, badge cu ora ultimei înregistrări (`role="status"` + `aria-label` „Ultima înregistrare, actualizată …", punct pulsant), badge cu numărul de puncte, ThemeToggle |
-| `Filters`            | `filters.tsx`              | Preset-uri de interval (`RANGE_PRESETS`: 24h/3d/7d/30d/all, relative la `endTs`), selector granularitate, buton export CSV                                                                                |
+| `Header`             | `header.tsx`               | Antet sticky: titlu, link Transelectrica, badge cu ora ultimei înregistrări (`role="status"` + `aria-label` „Ultima înregistrare, actualizată …", punct pulsant), badge cu numărul de puncte, ThemeToggle |     | `Filters` | `filters.tsx` | Preset-uri de interval (`RANGE_PRESETS`: 24h/3d/7d/30d/all, relative la `endTs`), selector granularitate (opțiuni incompatibile dezactivate prin `granularitiesForPreset` din `lib/sen/types.ts`), buton export CSV |
 | `KpiCards`           | `kpi-cards.tsx`            | 4 carduri: Consum, Producție, Sold (import/export), Share regenerabil — cu medie/min/max și trend față de medie                                                                                           |
 | `ProductionMixChart` | `production-mix-chart.tsx` | Aria stivuită pe surse (Recharts `Area` cu `stackId`) + linia de consum punctată deasupra                                                                                                                 |
 | `SourceDistribution` | `source-distribution.tsx`  | Donut (PieChart) cu mixul la ultima înregistrare + legendă detaliată (MW + %)                                                                                                                             |
@@ -61,6 +61,15 @@ Footer (sticky bottom)
 - **De ce nu `useEffect`**: regula `react-hooks/set-state-in-effect` interzice `setMounted(true)` în effect; `useSyncExternalStore` e modul canonic.
 
 **`ThemeToggle`** folosește `useMounted()` pentru `aria-label` corect (tema reală nu e cunoscută pe server). Iconițele Sun/Moon sunt conduse de clase CSS `dark:` (clasa e pusă pe `<html>` de next-themes înainte de hidratare) → nu pâlpâie.
+
+**`src/hooks/use-local-preference.ts`** — `useLocalPreference(key, defaultValue, isValid?)` pentru preferințe persistente (granularitate, preset):
+
+- Folosește `useSyncExternalStore` (același pattern canonic ca `useMounted`) → **fără hydration mismatch**: pe server returnează `defaultValue`, pe client citește din `localStorage` abia la prima hidratare.
+- Stochează **string-uri brute** (nu JSON) și validează la citire prin `isValid` — **type predicate** `(v: string) => v is T`, nu `(v) => boolean` (ex: granularități vechi după o schimbare de enum → `defaultValue`).
+- Scrie în `localStorage` direct în handler (nu în `useEffect`) — respectă `react-hooks/set-state-in-effect`.
+- `localStorage` indisponibil (sandbox, iframe fără permisiuni, storage blocat): citirea e în `try/catch` → `defaultValue`; scrierea eșuată e ignorată în tăcere (fără `StorageEvent` dispatch).
+- Logica de citire/scriere (protecția la excepții inclusă) e **extrasă în funcții pure** în [`src/lib/local-preference.ts`](../src/lib/local-preference.ts) (`readLocalPreference`/`writeLocalPreference`, storage injectat) — testate separat fără DOM (vezi [07-testing-ci.md](./07-testing-ci.md)); hook-ul e doar wrapper subțire. **Tipuri:** fără validator, `readLocalPreference` întoarce `string` (valoarea stocată nu e garantată a fi din setul lui `T` — nu mintim tipul); cu validator type predicate întoarce `T` confirmat. Callerii serioși trec un validator.
+- Validatorii trebuie să fie **stabili** (definiți la nivel de modul, nu inline în render) ca `getSnapshot` (useCallback cu dep `[key, fallback, isValid]`) să nu se recreeze inutil la fiecare randare — ex: `isPresetId`/`isGranularity` în `page.tsx`.
 
 **Configurare temă** (`providers.tsx`): `defaultTheme="dark"`, `enableSystem`, `disableTransitionOnChange`. Layout-ul are `lang="ro"` și `suppressHydrationWarning`.
 

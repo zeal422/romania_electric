@@ -6,18 +6,19 @@
 
 ### Date & logică
 
-| Întrebare                                                       | Fișier                                                            |
-| --------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Unde e structura unei înregistrări (ce câmpuri are)?            | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `SenReading`  |
-| Cum se agregă datele pe bucket-uri (10m/oră/zi)?                | [`src/lib/sen/aggregate.ts`](../src/lib/sen/aggregate.ts)         |
-| Cum se calculează media/statistici/pondere regenerabil/balanță? | [`src/lib/sen/stats.ts`](../src/lib/sen/stats.ts)                 |
-| Cum se formatează numerele/datele în ro-RO?                     | [`src/lib/sen/format.ts`](../src/lib/sen/format.ts)               |
-| Ce culori/etichete au sursele de energie?                       | [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts)         |
-| De unde citesc serverul datele (JSON)?                          | [`src/lib/sen/loader.ts`](../src/lib/sen/loader.ts)               |
-| Ce granularități există?                                        | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `Granularity` |
-| Cum se convertește xlsx-ul în JSON?                             | [`scripts/convert-sen.py`](../scripts/convert-sen.py)             |
-| Unde sunt datele?                                               | `data/sen-data.json`, `data/sen-summary.json`                     |
-| De unde vine fișierul sursă?                                    | `upload/Grafic_SEN.xlsx`                                          |
+| Întrebare                                                       | Fișier                                                                                                       |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Unde e structura unei înregistrări (ce câmpuri are)?            | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `SenReading`                                             |
+| Cum se agregă datele pe bucket-uri (10m/oră/zi)?                | [`src/lib/sen/aggregate.ts`](../src/lib/sen/aggregate.ts)                                                    |
+| Cum se calculează media/statistici/pondere regenerabil/balanță? | [`src/lib/sen/stats.ts`](../src/lib/sen/stats.ts)                                                            |
+| Cum se formatează numerele/datele în ro-RO?                     | [`src/lib/sen/format.ts`](../src/lib/sen/format.ts)                                                          |
+| Ce culori/etichete au sursele de energie?                       | [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts)                                                    |
+| De unde citesc serverul datele (JSON)?                          | [`src/lib/sen/loader.ts`](../src/lib/sen/loader.ts)                                                          |
+| Ce granularități există?                                        | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `Granularity` + `GRANULARITIES` (sursă unică)            |
+| Care sunt granularitățile compatibile cu un preset?             | `granularitiesForPreset` în [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) (sursă unică UI + normalizare) |
+| Cum se convertește xlsx-ul în JSON?                             | [`scripts/convert-sen.py`](../scripts/convert-sen.py)                                                        |
+| Unde sunt datele?                                               | `data/sen-data.json`, `data/sen-summary.json`                                                                |
+| De unde vine fișierul sursă?                                    | `upload/Grafic_SEN.xlsx`                                                                                     |
 
 ### API
 
@@ -30,19 +31,20 @@
 
 ### UI
 
-| Întrebare                                                      | Fișier                                                                                                                                                  |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cum e compusă pagina principală?                               | [`src/app/page.tsx`](../src/app/page.tsx)                                                                                                               |
-| Cum arată KPI-urile?                                           | [`src/components/dashboard/kpi-cards.tsx`](../src/components/dashboard/kpi-cards.tsx)                                                                   |
-| Cum arată graficul principal (mix pe surse)?                   | [`src/components/dashboard/production-mix-chart.tsx`](../src/components/dashboard/production-mix-chart.tsx)                                             |
-| Cum arată donut-ul cu mixul curent?                            | [`src/components/dashboard/source-distribution.tsx`](../src/components/dashboard/source-distribution.tsx)                                               |
-| Cum arată consum vs producție?                                 | [`src/components/dashboard/demand-supply-chart.tsx`](../src/components/dashboard/demand-supply-chart.tsx)                                               |
-| Cum arată balanța import/export?                               | [`src/components/dashboard/balance-chart.tsx`](../src/components/dashboard/balance-chart.tsx)                                                           |
-| Cum arată tabelul de date?                                     | [`src/components/dashboard/data-table.tsx`](../src/components/dashboard/data-table.tsx)                                                                 |
-| Cum funcționează filtrele (preset-uri, granularitate, export)? | [`src/components/dashboard/filters.tsx`](../src/components/dashboard/filters.tsx)                                                                       |
-| Cum funcționează toggle-ul de temă?                            | [`src/components/dashboard/theme-toggle.tsx`](../src/components/dashboard/theme-toggle.tsx) + [`src/hooks/use-mounted.ts`](../src/hooks/use-mounted.ts) |
-| Unde e tooltip-ul comun al graficelor?                         | [`src/components/dashboard/chart-tooltip.tsx`](../src/components/dashboard/chart-tooltip.tsx)                                                           |
-| Cum sunt providers (tema + React Query)?                       | [`src/components/providers.tsx`](../src/components/providers.tsx)                                                                                       |
+| Întrebare                                                             | Fișier                                                                                                                                                                               |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cum e compusă pagina principală?                                      | [`src/app/page.tsx`](../src/app/page.tsx)                                                                                                                                            |
+| Cum arată KPI-urile?                                                  | [`src/components/dashboard/kpi-cards.tsx`](../src/components/dashboard/kpi-cards.tsx)                                                                                                |
+| Cum arată graficul principal (mix pe surse)?                          | [`src/components/dashboard/production-mix-chart.tsx`](../src/components/dashboard/production-mix-chart.tsx)                                                                          |
+| Cum arată donut-ul cu mixul curent?                                   | [`src/components/dashboard/source-distribution.tsx`](../src/components/dashboard/source-distribution.tsx)                                                                            |
+| Cum arată consum vs producție?                                        | [`src/components/dashboard/demand-supply-chart.tsx`](../src/components/dashboard/demand-supply-chart.tsx)                                                                            |
+| Cum arată balanța import/export?                                      | [`src/components/dashboard/balance-chart.tsx`](../src/components/dashboard/balance-chart.tsx)                                                                                        |
+| Cum arată tabelul de date?                                            | [`src/components/dashboard/data-table.tsx`](../src/components/dashboard/data-table.tsx)                                                                                              |
+| Cum funcționează filtrele (preset-uri, granularitate, export)?        | [`src/components/dashboard/filters.tsx`](../src/components/dashboard/filters.tsx)                                                                                                    |
+| Cum funcționează toggle-ul de temă?                                   | [`src/components/dashboard/theme-toggle.tsx`](../src/components/dashboard/theme-toggle.tsx) + [`src/hooks/use-mounted.ts`](../src/hooks/use-mounted.ts)                              |
+| Cum persistă preferințele UI (granularitate, preset) în localStorage? | [`src/hooks/use-local-preference.ts`](../src/hooks/use-local-preference.ts) (wrapper React) + [`src/lib/local-preference.ts`](../src/lib/local-preference.ts) (logica pură, testată) |
+| Unde e tooltip-ul comun al graficelor?                                | [`src/components/dashboard/chart-tooltip.tsx`](../src/components/dashboard/chart-tooltip.tsx)                                                                                        |
+| Cum sunt providers (tema + React Query)?                              | [`src/components/providers.tsx`](../src/components/providers.tsx)                                                                                                                    |
 
 ### Design & stil
 
@@ -55,11 +57,11 @@
 
 ### Teste & tooling
 
-| Întrebare                  | Fișier                                                        |
-| -------------------------- | ------------------------------------------------------------- |
-| Unde sunt testele unitare? | [`tests/sen/`](../tests/sen/)                                 |
-| Cum rulez tot CI-ul?       | `package.json` → scriptul `check`                             |
-| Cum verific hidratarea?    | [`scripts/check-hydration.sh`](../scripts/check-hydration.sh) |
+| Întrebare                  | Fișier                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Unde sunt testele unitare? | [`tests/sen/`](../tests/sen/) + [`tests/local-preference.test.ts`](../tests/local-preference.test.ts) |
+| Cum rulez tot CI-ul?       | `package.json` → scriptul `check`                                                                     |
+| Cum verific hidratarea?    | [`scripts/check-hydration.sh`](../scripts/check-hydration.sh)                                         |
 
 ### Documentație
 
