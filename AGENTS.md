@@ -18,7 +18,7 @@ Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**,
 bun install            # instalează dependențele (Bun, NU npm/pnpm/yarn)
 bun run dev            # server de dezvoltare pe :3000
 bun run check          # CI complet: format → docs → lint → typecheck → teste → build
-bun test               # 90 teste unitare — TOATE trebuie să treacă
+bun test               # 131 teste unitare — TOATE trebuie să treacă
 bun run typecheck      # tsc --noEmit — trebuie să fie curat
 bun run lint           # ESLint — trebuie să fie curat
 bun run format:check   # Prettier — trebuie să fie curat
@@ -35,12 +35,14 @@ bun run check:hydration  # verifică erori de hidratare în browser (necesită a
 ```
 src/lib/sen/        ← LOGICA DE DATE. Pură, tipizată, deterministă, testată.
 src/lib/sen/live.ts ← date live Transelectrica (server-only: fetch TTL + fallback static).
-src/app/api/sen/    ← API routes subțiri (fără logică de business).
-src/hooks/          ← Hook-uri client (React Query).
-src/components/dashboard/ ← UI dashboard. src/components/ui/ = shadcn/ui (nu modifica de mână).
-data/               ← sen-data.json + sen-summary.json (GENERATE, nu le edita manual).
-scripts/            ← convert-sen.py (pipeline date) + check-hydration.sh (CI).
-tests/sen/          ← 90 teste unitare pentru lib/sen (incl. live.ts).
+src/lib/sen/storage.ts ← stocare ISPOZ (server-only: snapshot live TTL + serie orară acumulată).
+src/app/api/sen/    ← API routes subțiri (fără logică de business) — incl. /api/sen/storage.
+src/hooks/          ← Hook-uri client (React Query) — incl. use-storage-data.ts.
+src/components/dashboard/ ← UI dashboard (incl. storage-card.tsx). src/components/ui/ = shadcn/ui (nu modifica de mână).
+data/               ← sen-data.json + sen-summary.json + sen-storage.json (GENERATE, nu le edita manual).
+scripts/            ← convert-sen.py (pipeline date + --capture-storage) + check-hydration.sh (CI).
+.github/workflows/  ← data-refresh.yml (zilnic) + storage-capture.yml (orar).
+tests/              ← 131 teste unitare (lib/sen + storage + captură Python + preferințe).
 upload/             ← Grafic_SEN.xlsx (sursa datelor).
 ```
 
@@ -67,13 +69,13 @@ Dacă „repar" niște date „ca să iasă testele", ai greșit — repară scr
 
 Toate etichetele, tooltip-urile, aria-label-urile și mesajele UI sunt în **română** (diacritice corecte: „Producție", „Cărbune", „Balanța"). Nu introduce text în engleză în UI. Codul (variabile, comentarii) poate fi în engleză sau română — proiectul folosește română pentru comentarii; păstrează stilul existent.
 
-### 4.5. Culorile și metadatele surselor au o singură sursă de adevăr
+### 4.5. Sursele și constantele de business au o singură sursă de adevăr: `constants.ts`
 
-Totul despre surse (culori semantice, etichete, ordinea de afișare, clasificare fosil/regenerabil) e în **`src/lib/sen/constants.ts`** (`SOURCES`, `SOURCE_ORDER`, `RENEWABLE_FIELDS`, `FOSSIL_FIELDS`). **Nu hardcoda culori sau etichete în componente.** Ordinea contorsionată `SOURCE_ORDER` (fosil jos → regenerabil sus) e intenționată pentru stacked area.
+Totul despre surse (culori semantice, etichete, ordinea de afișare, clasificare fosil/regenerabil) e în **`src/lib/sen/constants.ts`** (`SOURCES`, `SOURCE_ORDER`, `RENEWABLE_FIELDS`, `FOSSIL_FIELDS`). **Nu hardcoda culori sau etichete în componente.** La fel, **constantele numerice de business folosite de componente** (praguri, limite — ex: `STORAGE_TREND_THRESHOLD_MW`) se centralizedază tot în `constants.ts` — nu le hardcoda în componente. (TTL-urile și backoff-urile server-side — `LIVE_TTL_MS`, `STORAGE_TTL_MS` etc. — NU se mută în `constants.ts`: rămân în modulele lor server-only, `live.ts`/`storage.ts`.) Ordinea contorsionată `SOURCE_ORDER` (fosil jos → regenerabil sus) e intenționată pentru stacked area.
 
 ### 4.6. Granularități și API — nu inventa
 
-Granularități valide: `raw` | `10m` | `hour` | `day` (vezi `types.ts`). Endpoint-uri existente: `/api/sen`, `/api/sen/summary`, `/api/sen/export`. Parametrii `from`/`to` sunt **epoch ms**. La `raw` pe intervale mari, API-ul face downsampling la 1.200 de puncte — nu „corecta" asta, e protecție intenționată pentru client.
+Granularități valide: `raw` | `10m` | `hour` | `day` (vezi `types.ts`). Endpoint-uri existente: `/api/sen`, `/api/sen/summary`, `/api/sen/storage`, `/api/sen/export`. Parametrii `from`/`to` sunt **epoch ms**. La `raw` pe intervale mari, API-ul face downsampling la 1.200 de puncte — nu „corecta" asta, e protecție intenționată pentru client.
 
 ### 4.7. Timestamps: afișează fidel, nu „repara" anul
 
@@ -128,6 +130,17 @@ Regula de bază: dacă vrei să schimbi ceva legat de **date** → `src/lib/sen/
 4. Rulează `bun run typecheck` + `bun test` + `bun run lint` + `bun run format:check`.
 5. Verifică vizual în browser (inclusiv tema light și viewport mobil 390px) și consola fără erori.
 6. Actualizează `CHANGELOG.md` dacă e o schimbare notabilă.
+7. **Când oferi un mesaj de commit, folosește stilul „Conventional Commits" cu corp bullet points** — formatul exact:
+
+```
+<tip>: <titlu concis> (+ opțional detalii în titlu după virgulă)
+
+- <bullets>
+- <fiecare schimbare notabilă pe o linie proprie>
+- <în română, cu diacritice, ca restul proiectului>
+```
+
+Tipuri valide: `feat` (funcționalitate nouă), `fix` (corectură), `docs` (documentație), `refactor`, `chore` (curățenie/întreținere), `test`, `perf`. Titlul = o frază scurtă (max ~72 caractere). Corpul cu `-` listează fiecare schimbare notabilă (modul nou, fix, workflow, documentație, teste, curățenie) — nu rezuma, enumeră. Mesajul se oferă **doar la cerere**; agentul nu face commit-uri niciodată.
 
 ## 7. Workflow pentru verificarea cererilor de fix (ex: `TO_FIX.md`)
 

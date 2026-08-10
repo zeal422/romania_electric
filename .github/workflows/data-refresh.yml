@@ -21,10 +21,13 @@ jobs:
           python-version: "3.12"
 
       - name: Fetch SEN data (incremental, live endpoint Transelectrica)
-        # continue-on-error: un eșec tranzitoriu de rețea nu pierde ziua — step-ul
-        # de commit de mai jos nu comite nimic dacă datele nu s-au schimbat,
-        # iar cron-ul de a doua zi reîncearcă oricum.
-        continue-on-error: true
+        # Fără continue-on-error: un eșec tranzitoriu de rețea e deja tolerat de
+        # script (fetch_live prinde URLError/Exception intern și întoarce date goale
+        # → exit 0 → step-ul de commit nu găsește schimbări). O eroare REALĂ (bug de
+        # script, eroare de scriere) iese non-zero → step-urile următoare sunt oprite
+        # și workflow-ul e vizibil roșu în Actions, nu mascat ca warning (fix TO_FIX
+        # F2). Pentru eșecuri de rețea repetate, pasul de prospețime de mai jos prinde
+        # datele îmbătrânite (prag 40h) — eșecul devine vizibil oricum.
         run: python3 scripts/convert-sen.py --fetch
 
       - name: Verify data freshness (fail on repeated fetch failures)
@@ -61,6 +64,50 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Rebase înainte de commit: storage-capture (cron orar) poate împinge
+          # pe aceeași ramură între checkout și push — fără pull, push-ul ar fi
+          # respins ca non-fast-forward și ziua s-ar pierde. Push-ul are retry
+          # (3 încercări): la respingere (alt workflow a împins între timp)
+          # refacem rebase pe remote și reîncercăm — refresh-ul zilei NU se
+          # pierde. Eșecurile REALE (rebase eșuat sau push epuizat) ies cu exit
+          # non-zero → workflow-ul e vizibil roșu în Actions (monitoring prinde
+          # probleme persistente); datele se recuperează oricum la următoarea
+          # rulare (cron-ul zilnic reface fetch-ul incremental).
+          # Branch-ul țintă: GITHUB_REF_NAME e setat corect chiar și pe detached
+          # checkout (actions/checkout face checkout la SHA, deci `git branch
+          # --show-current` întoarce gol) — default branch la schedule, branch-ul
+          # selectat la workflow_dispatch (fix TO_FIX F-1).
+          BRANCH="${GITHUB_REF_NAME:-main}"
+          git pull --rebase --autostash origin "$BRANCH" || {
+            echo "::error::rebase a eșuat — refresh-ul zilei NU a fost persistat (vizibil în Actions; cron-ul reia mâine)"
+            git rebase --abort 2>/dev/null || true
+            exit 1
+          }
           git add data/sen-data.json data/sen-summary.json
-          git commit -m "chore(data): refresh SEN data from Transelectrica"
-          git push
+          # „Nothing to commit” doar când NU există schimbări staged; dacă commit-ul
+          # eșuează cu schimbări staged, propagăm eșecul (nu-l mascăm ca succes).
+          if git diff --cached --quiet; then
+            echo "Nothing to commit — data already up to date."
+            exit 0
+          fi
+          if ! git commit -m "chore(data): refresh SEN data from Transelectrica"; then
+            echo "::error::commit a eșuat cu schimbări staged — datele NU sunt persistate (vizibil în Actions)"
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed SEN refresh (attempt $attempt/3)."
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::push respins (încercarea $attempt/3) — rebase + reîncerc"
+              git pull --rebase --autostash origin "$BRANCH" || {
+                echo "::error::rebase a eșuat la retry — refresh-ul zilei NU a fost persistat (vizibil în Actions)"
+                git rebase --abort 2>/dev/null || true
+                exit 1
+              }
+              sleep 5
+            fi
+          done
+          echo "::error::push a eșuat după 3 încercări — refresh-ul zilei NU a fost persistat (vizibil în Actions; cron-ul reia mâine)"
+          exit 1

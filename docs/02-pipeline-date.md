@@ -21,6 +21,17 @@ src/lib/sen/live.ts      ← fetch live Transelectrica (server-only, TTL 10 min 
         │
         ▼
 API routes (/api/sen, /api/sen/summary, /api/sen/export)
+
+Stocare (ISPOZ) — serie temporală construită de noi:
+snapshot /sen-filter (transelectrica.ro/sen-filter, JSON cu coduri SEN)
+        │  scripts/convert-sen.py --capture-storage  (workflow storage-capture, cron orar)
+        ▼
+data/sen-storage.json  ← capturi acumulate [{t, ts, ispoz}]
+        │
+src/lib/sen/storage.ts ← încarcă seria + fetch snapshot live (TTL 10 min, fallback)
+        │
+        ▼
+API route (/api/sen/storage)
 ```
 
 ## 1. Sursele datelor
@@ -56,7 +67,7 @@ Pașii comuni:
 4. **Sortează crescător după `ts`**.
 5. Scrie `data/sen-data.json` (compact) și `data/sen-summary.json` (indentat, `ensure_ascii=False`).
 
-> **Automatizare**: workflow-ul [`.github/workflows/data-refresh.yml`](../.github/workflows/data-refresh.yml) rulează zilnic `bun run data:refresh` (cron `30 3 * * *` UTC = 06:30 ora României vara) și face commit — istoricul crește singur, iar Vercel (Git integration) redeploy-ează automat. După fetch, un pas verifică **prospețimea** datelor (prag ~40h, calibrat pe contractul fake-UTC: endTs e cu ~2-3h „înaintea" UTC-ului real; o zi pierdută dă ~21h la ora cronului, max ~36.5h chiar la un run manual seara) și eșuează vizibil doar la eșecuri **repetate** (două+ zile consecutiv ≈ min 45h) — un eșec tranzitoriu nu produce alarmă falsă.
+> **Automatizare**: workflow-ul [`.github/workflows/data-refresh.yml`](../.github/workflows/data-refresh.yml) rulează zilnic `bun run data:refresh` (cron `30 3 * * *` UTC = 06:30 ora României vara) și face commit — pasul de fetch **nu** folosește `continue-on-error`: toleranța la un eșec tranzitoriu de rețea e internă în script (`fetch_live` prinde `URLError`/`Exception` și întoarce date goale → exit 0 → „No changes”), iar o eroare reală de script iese non-zero și e vizibilă în Actions (fix TO_FIX F2) — istoricul crește singur, iar Vercel (Git integration) redeploy-ează automat. Înainte de commit face `git pull --rebase --autostash` (poate suprapune cron-ul orar `storage-capture` pe aceeași ramură), iar **push-ul are retry (3 încercări)**: la respingere non-fast-forward (celălalt workflow a împins între rebase și push) reface rebase pe remote și reîncearcă — commit-ul nu se pierde. **Eșecurile REALE ies cu exit non-zero** (rebase eșuat, commit eșuat cu schimbări staged, push epuizat) → workflow-ul e vizibil roșu în Actions pentru monitoring; datele se recuperează oricum la următoarea rulare (cron-ul reface fetch-ul). „Nothing to commit" se consideră doar când nu există schimbări staged (fix TO_FIX #1). După fetch, un pas verifică **prospețimea** datelor (prag ~40h, calibrat pe contractul fake-UTC: endTs e cu ~2-3h „înaintea" UTC-ului real; o zi pierdută dă ~21h la ora cronului, max ~36.5h chiar la un run manual seara) și eșuează vizibil doar la eșecuri **repetate** (două+ zile consecutiv ≈ min 45h) — un eșec tranzitoriu nu produce alarmă falsă.
 
 > **Nu modifica manual `data/*.json`.** Dacă „repari" datele „ca să iasă testele", ai greșit — repară scriptul sau logica, nu datele. Dacă schimbi structura output-ului, actualizează și tipurile din [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) și testele.
 
@@ -107,7 +118,27 @@ Structura corespunde tipului [`SenSummaryResponse`](../src/lib/sen/types.ts).
 - `resetCache()` → invalidează cache-ul (folosit în teste).
 - **Server-only**: conține `node:fs` — **nu** îl importa în componente client. Documentat în [AGENTS.md](../AGENTS.md).
 
-## 6. Date live la runtime: `src/lib/sen/live.ts`
+## 6. Stocarea (ISPOZ): `--capture-storage` + `storage.ts`
+
+**Context**: Transelectrica a introdus „Instalații de stocare" (ISPOZ, segment violet `#A582FF` în „SEN Grafic"). Stocarea e expusă **DOAR ca snapshot curent** prin `https://www.transelectrica.ro/sen-filter` (JSON: listă de `{cod: valoare}` cu `ISPOZ` în MW), **fără istoric** — nici în payload-ul live clasic (coloana a 12-a e goală), nici cu `display=ISPOZ`. De aceea **istoricul îl construim noi**, prin capturi periodice.
+
+**Captura** — `python3 scripts/convert-sen.py --capture-storage`:
+
+- Fetch la `/sen-filter`, extrage `ISPOZ` cu `extract_ispoz` (funcție pură: valoare numerică ≥ 0 și finită — respinge și NaN/Inf; payload lipsă/invalid → ignorat silențios, datele existente rămân).
+- Append cu `merge_storage` (funcție pură): **dedupe pe `t`** (ISO la nivel de secundă — două rulări în aceeași secundă nu creează duplicate) **+ suprascriere dacă valoarea diferă** (o rulare în aceeași secundă cu ISPOZ schimbat NU e pierdută — fix P3-003); fișiere cu duplicate vechi sau structură non-list sunt curățate, fără crash (fix P2-001). Scrie la **`data/sen-storage.json`**: `[{t, ts, ispoz}]`, sortat cronologic.
+- **Automatizare**: workflow-ul [`.github/workflows/storage-capture.yml`](../.github/workflows/storage-capture.yml) — cron **orar** (`0 * * * *`), commit doar dacă fișierul s-a schimbat — pasul de captură **nu** folosește `continue-on-error`: toleranța la un eșec tranzitoriu de rețea e internă în script (`capture_storage` prinde `URLError`/`Exception` și iese cu 0 → „No changes"), iar o eroare reală de script iese non-zero și e vizibilă în Actions (fix TO_FIX F2). Înainte de commit face `git pull --rebase --autostash` (cron-ul orar poate suprapune `data-refresh` pe aceeași ramură), iar **push-ul are retry (3 încercări)** ca la data-refresh; **eșecurile reale ies non-zero** (vizibile în Actions). Spre deosebire de data-refresh (fetch incremental → backfill posibil), **snapshot-ul unei ore pierdute e irecuperabil** — următoarea captură e o valoare nouă (fix TO_FIX #1). 24 puncte/zi ≈ 720 min Actions/lună (confortabil în free tier). Istoricul începe de la prima captură; granularitatea „10 min" în UI va afișa punctele orare (nu există 10-min în sursă).
+- **Contract de timp (fix TO_FIX #6)**: `t` e wall-clock România etichetat UTC, iar `ts` e **epoch-ul UTC al valorii etichetate** (la fel ca `parse_ts`/`make_record` pentru datele SEN — NU instant-ul local real, care ar fi cu 2-3h în urmă).
+- **Testabilitate**: `SEN_STORAGE_URL` și `SEN_STORAGE_OUT` sunt overridable prin env (mock server + fișiere temporare în teste) — logica e acoperită de `tests/capture-storage.test.ts` (vezi [07-testing-ci.md](./07-testing-ci.md)).
+
+**Runtime** — [`src/lib/sen/storage.ts`](../src/lib/sen/storage.ts) (server-only):
+
+- `loadStorageHistory()` — seria acumulată (cache singleton, ordonată cronologic).
+- `extractIspoz(payload)` / `fetchCurrentIspoz()` — parse + fetch snapshot live (pure/testabile).
+- `getStorageData()` — valoarea curentă (snapshot live cu **TTL 10 min**, **fallback la ultima captură** la eșec, **backoff 1 min** după eșec) + seria completă → răspunsul `/api/sen/storage`.
+
+> **Nu modifica manual `data/sen-storage.json`** — e generat de `--capture-storage` (aceeași regulă ca `sen-data.json`).
+
+## 7. Date live la runtime: `src/lib/sen/live.ts`
 
 - `parseLiveLine` / `parseLivePayload` — parsează textul de la endpoint (funcții pure, testate).
 - `mergeReadings(static, live)` — dedupe pe `ts` (live câștigă), sortat crescător (pură).
@@ -122,6 +153,7 @@ Structura corespunde tipului [`SenSummaryResponse`](../src/lib/sen/types.ts).
 ```bash
 bun run data:convert      # rebuild complet din xlsx
 bun run data:refresh      # fetch incremental live (adaugă datele noi)
+python3 scripts/convert-sen.py --capture-storage   # captură manuală stocare (ISPOZ)
 # apoi repornește serverul (loader-ul are cache singleton)
 ```
 

@@ -103,6 +103,44 @@ export interface SenApiResponse {
   };
 }
 
+/** Un punct de captură a stocării (ISPOZ), acumulat de workflow-ul storage-capture. */
+export interface StoragePoint {
+  /** ISO timestamp al capturii (wall-clock RO etichetat UTC, la nivel de secundă). */
+  t: string;
+  /** Epoch milliseconds, folosit pentru sortare și filtrare. */
+  ts: number;
+  /** Stocarea curentă în MW („Instalații de stocare” — ISPOZ, valoare numerică ≥ 0). */
+  ispoz: number;
+}
+
+/** Valoarea curentă de stocare (snapshot live sau punct din istoric). */
+export interface StorageCurrent {
+  t: string;
+  ts: number;
+  ispoz: number;
+  /**
+   * Proveniența valorii:
+   * - `"live"` — snapshot de la `/sen-filter` (proaspăt în TTL sau stale din cache);
+   * - `"capture"` — ultimul punct din istoricul acumulat (fallback pur).
+   * UI-ul etichetează badge-ul după această proveniență („live" vs „ultima captură").
+   */
+  source: "live" | "capture";
+}
+
+/** Răspunsul endpoint-ului /api/sen/storage. */
+export interface StorageApiResponse {
+  /** Valoarea curentă: snapshot live (dacă fetch-ul a reușit) sau ultima captură. */
+  current: StorageCurrent | null;
+  /** Seria completă acumulată (de la prima captură, ordonată cronologic). */
+  history: StoragePoint[];
+  /**
+   * Epoch ms când a fost obținut `current` din live (0 dacă valoarea vine din
+   * istoric — `source: "capture"`). Un snapshot live stale (cache expirat)
+   * păstrează `fetchedAt`-ul original > 0 cu `source: "live"`.
+   */
+  fetchedAt: number;
+}
+
 /** Răspunsul endpoint-ului /api/sen/summary. */
 export interface SenSummaryResponse {
   /**

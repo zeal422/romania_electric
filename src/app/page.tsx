@@ -13,6 +13,7 @@ import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { ProductionMixChart } from "@/components/dashboard/production-mix-chart";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { SourceDistribution } from "@/components/dashboard/source-distribution";
+import { StorageCard } from "@/components/dashboard/storage-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocalPreference } from "@/hooks/use-local-preference";
@@ -138,14 +139,19 @@ export default function Home() {
             )}
           </SectionCard>
 
-          <SectionCard
-            title="Mixul curent"
-            subtitle="Defalcarea producției la ultima înregistrare"
-            chartHeight={360}
-            contentClassName="!h-auto"
-          >
-            <SourceDistribution latest={summary?.latest} />
-          </SectionCard>
+          {/* Coloana laterală: Mixul curent + Stocare (ISPOZ) — seria se
+              construiește prin capturi orare (workflow storage-capture). */}
+          <div className="flex flex-col gap-4">
+            <SectionCard
+              title="Mixul curent"
+              subtitle="Defalcarea producției la ultima înregistrare"
+              chartHeight={360}
+              contentClassName="!h-auto"
+            >
+              <SourceDistribution latest={summary?.latest} />
+            </SectionCard>
+            <StorageCard />
+          </div>
         </div>
 
         {/* Legendă comună surse */}

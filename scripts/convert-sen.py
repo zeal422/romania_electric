@@ -25,6 +25,7 @@ Output schema (array of objects):
 Also writes data/sen-summary.json with global statistics for instant KPI rendering.
 """
 import json
+import math
 import os
 import sys
 import urllib.request
@@ -36,6 +37,9 @@ SRC = os.path.join(ROOT, "upload", "Grafic_SEN.xlsx")
 OUT_DIR = os.path.join(ROOT, "data")
 OUT_DATA = os.path.join(OUT_DIR, "sen-data.json")
 OUT_SUMMARY = os.path.join(OUT_DIR, "sen-summary.json")
+# Overridable prin env pentru teste (fișiere temporare), ca să nu atingem niciodată
+# datele reale din repo: SEN_STORAGE_URL (endpoint mock) + SEN_STORAGE_OUT (fișier temp).
+OUT_STORAGE = os.environ.get("SEN_STORAGE_OUT", os.path.join(OUT_DIR, "sen-storage.json"))
 
 # Ordinea coloanelor din xlsx (header: …;Carbune;Hidrocarburi;Ape;Nuclear;Eolian;Foto;Biomasa;Sold).
 FIELDS = [
@@ -306,6 +310,146 @@ def refresh_from_live():
     write_outputs(merged)
 
 
+# Overridable prin env pentru teste (mock server local): SEN_STORAGE_URL.
+STORAGE_URL = os.environ.get("SEN_STORAGE_URL", "https://www.transelectrica.ro/sen-filter")
+
+
+def load_existing_storage():
+    """Încarcă seria existentă din OUT_STORAGE; tolerantă la lipsă/corupt/non-list.
+
+    Returnează o listă (goala dacă fișierul nu există, e JSON invalid sau nu e
+    o listă — nu aruncă niciodată).
+    """
+    if not os.path.exists(OUT_STORAGE):
+        return []
+    try:
+        with open(OUT_STORAGE, encoding="utf-8") as f:
+            existing = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[capture_storage] fișier corupt ({e}) — pornesc de la zero", file=sys.stderr)
+        return []
+    if not isinstance(existing, list):
+        print(
+            f"[capture_storage] structură neașteptată în {OUT_STORAGE} — pornesc de la zero",
+            file=sys.stderr,
+        )
+        return []
+    return existing
+
+
+def extract_ispoz(payload):
+    """Extrage ISPOZ dintr-un payload `/sen-filter` (listă de {cod: valoare}).
+
+    Returnează float ≥ 0 sau None dacă lipsește / nu e numeric / negativ /
+    non-finit (NaN, Inf). Funcție pură, testabilă.
+    """
+    if not isinstance(payload, list):
+        return None
+    for pair in payload:
+        if isinstance(pair, dict) and "ISPOZ" in pair:
+            try:
+                v = float(pair["ISPOZ"])
+            except (TypeError, ValueError):
+                return None
+            # Reject și NaN/Inf: `nan < 0` e fals, deci un check doar pe `< 0`
+            # ar lăsa valorile non-finite să treacă (extract_ispoz din TS e la fel).
+            if not math.isfinite(v) or v < 0:
+                return None
+            return v
+    return None
+
+
+def merge_storage(existing, rec):
+    """Merge un punct nou în seria existentă, cu dedupe pe `t` (secundă).
+
+    Returnează (merged, changed):
+    - merged: seria deduplicată pe `t` și sortată ascendent după `ts`;
+    - changed: True dacă punctul aduce ceva nou — `t` nou SAU valoare ISPOZ
+      diferită la același `t`. Fără comparația valorii, o rulare în aceeași
+      secundă cu o valoare schimbată ar fi ignorată (early-return) și update-ul
+      s-ar pierde — fix P3-003.
+    """
+    by_key = {}
+    for r in existing:
+        # Excludem record-urile cu t dar fără ts (corupte): sorted() de mai jos
+        # ar crăpa cu KeyError pe r["ts"] — toleranță la fel de strictă ca
+        # load_existing_storage (fix TO_FIX #5).
+        if isinstance(r, dict) and "t" in r and "ts" in r:
+            by_key[r["t"]] = r
+    prev = by_key.get(rec["t"])
+    changed = prev is None or prev.get("ispoz") != rec["ispoz"]
+    by_key[rec["t"]] = rec
+    merged = sorted(by_key.values(), key=lambda x: x["ts"])
+    return merged, changed
+
+
+def capture_storage():
+    """Modul --capture-storage: prinde valoarea curentă de stocare (ISPOZ).
+
+    Transelectrica expune stocarea doar ca snapshot (sen-filter), fără istoric.
+    Construim noi istoricul: la fiecare rulare (orar, prin workflow-ul
+    storage-capture.yml) citim ISPOZ și îl adăugăm cu dedupe pe ts la
+    data/sen-storage.json: [{"t", "ts", "ispoz"}].
+
+    Fallback silențios la eșec de rețea (data deja capturată rămâne); sanity:
+    valoarea trebuie să fie numerică și ≥ 0, altfel ignorăm răspunsul.
+    """
+    os.makedirs(os.path.dirname(OUT_STORAGE) or ".", exist_ok=True)
+
+    existing = load_existing_storage()
+
+    req = urllib.request.Request(STORAGE_URL, headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            text = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.URLError as e:
+        print(f"[capture_storage] eșec de rețea: {e} — păstrez datele existente", file=sys.stderr)
+        return
+    except Exception as e:
+        print(f"[capture_storage] eroare neașteptată: {e} — păstrez datele existente", file=sys.stderr)
+        return
+
+    try:
+        # sen-filter răspunde cu o listă de obiecte {cod: valoare}:
+        #   [{"KOZL115":"176"},{"ISPOZ":"30"},...]
+        payload = json.loads(text)
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        print(f"[capture_storage] răspuns neașteptat ({e}) — ignor", file=sys.stderr)
+        return
+
+    ispoz = extract_ispoz(payload)
+    if ispoz is None:
+        print("[capture_storage] ISPOZ lipsă sau invalid — ignor payload", file=sys.stderr)
+        return
+
+    now = datetime.now(TZ_RO)
+    # Contract fake-UTC (ca parse_ts/make_record pentru datele SEN): ts = epoch-ul
+    # UTC al valorii t etichetate (wall-clock RO), NU instant-ul real — altfel
+    # ts-ul ar fi cu 2-3h în urmă față de t (fix TO_FIX #6).
+    dt = parse_ts(now.strftime("%d-%m-%Y %H:%M:%S"))
+    rec = {
+        "t": dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "ts": int(dt.timestamp() * 1000),
+        "ispoz": ispoz,
+    }
+
+    # Dedupe pe `t` (ISO la nivel de secundă) — două rulări în aceeași secundă
+    # nu trebuie să creeze duplicate vizuale (ts-urile brute diferă la ms).
+    # `changed` compară și valoarea: aceeași secundă + valoare diferită = punct
+    # nou (suprascrie), nu „deja la zi". Comparăm pe chei, nu pe lungime: un
+    # fișier cu duplicate vechi ar umfla len(existing) și ar ascunde punctul nou
+    # (sau ar lăsa duplicatele necurățate) — vezi merge_storage.
+    merged, changed = merge_storage(existing, rec)
+
+    if not changed and len(merged) == len(existing):
+        print("No new storage capture — data already up to date.", file=sys.stderr)
+        return
+
+    with open(OUT_STORAGE, "w", encoding="utf-8") as f:
+        json.dump(merged, f, separators=(",", ":"))
+    print(f"Wrote {OUT_STORAGE} ({len(merged)} points, latest ispoz={ispoz} MW)", file=sys.stderr)
+
+
 def convert_from_xlsx():
     """Modul implicit (data:convert): rebuild complet din upload/Grafic_SEN.xlsx."""
     import openpyxl  # lazy: necesar doar pentru modul xlsx (--fetch e stdlib-only)
@@ -340,7 +484,9 @@ def convert_from_xlsx():
 
 
 if __name__ == "__main__":
-    if "--fetch" in sys.argv:
+    if "--capture-storage" in sys.argv:
+        capture_storage()
+    elif "--fetch" in sys.argv:
         refresh_from_live()
     else:
         convert_from_xlsx()

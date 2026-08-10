@@ -1,0 +1,89 @@
+name: storage-capture
+
+# Captură orară a stocării (ISPOZ) — Transelectrica expune stocarea doar ca
+# snapshot (sen-filter), fără istoric. Construim noi seria: la fiecare rulare
+# citim valoarea curentă și o adăugăm (cu dedupe) la data/sen-storage.json.
+#
+# Cron orar: 24 puncte/zi ≈ 720 min Actions/lună — confortabil în free tier.
+# Commit-ul declanșează redeploy-ul Vercel (Git integration).
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Capture current storage (ISPOZ from sen-filter)
+        # Fără continue-on-error: un eșec tranzitoriu de rețea e deja tolerat de
+        # script (capture_storage prinde URLError/Exception intern și iese cu 0 —
+        # step-ul de commit nu găsește schimbări, cron-ul orar reîncearcă). O eroare
+        # REALĂ (bug de script, eroare de scriere) iese non-zero → vizibilă în
+        # Actions, nu mascată ca warning (fix TO_FIX F2).
+        run: python3 scripts/convert-sen.py --capture-storage
+
+      - name: Commit updated storage data (if any)
+        run: |
+          if git diff --quiet -- data/sen-storage.json; then
+            echo "No changes — storage data already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Rebase înainte de commit: cron-ul orar poate suprapune data-refresh
+          # (ambele împing pe aceeași ramură) — fără pull, push-ul ar fi respins
+          # ca non-fast-forward. Push-ul are retry (3 încercări): la respingere
+          # (alt workflow a împins între timp) refacem rebase pe remote și
+          # reîncercăm. După epuizarea retry-urilor, un rebase/commit/push eșuat
+          # poate crea un GAP ORAR IRECUPERABIL: snapshot-ul orei nu poate fi
+          # reconstruit (următoarea captură e o valoare nouă, nu „reface fetch-ul").
+          # De aceea eșecurile persistente ies cu exit non-zero → workflow-ul e
+          # vizibil roșu în Actions (monitoring prinde problemele).
+          # Branch-ul țintă: GITHUB_REF_NAME e setat corect chiar și pe detached
+          # checkout (actions/checkout face checkout la SHA, deci `git branch
+          # --show-current` întoarce gol) — default branch la schedule, branch-ul
+          # selectat la workflow_dispatch (fix TO_FIX F-1).
+          BRANCH="${GITHUB_REF_NAME:-main}"
+          git pull --rebase --autostash origin "$BRANCH" || {
+            echo "::error::rebase a eșuat — captura orei NU a fost persistată (vizibil în Actions; cron-ul reia în ora următoare)"
+            git rebase --abort 2>/dev/null || true
+            exit 1
+          }
+          git add data/sen-storage.json
+          # „Nothing to commit” doar când NU există schimbări staged; dacă commit-ul
+          # eșuează cu schimbări staged, propagăm eșecul (nu-l mascăm ca succes).
+          if git diff --cached --quiet; then
+            echo "Nothing to commit — storage data already up to date."
+            exit 0
+          fi
+          if ! git commit -m "chore(data): capture storage (ISPOZ) snapshot"; then
+            echo "::error::commit a eșuat cu schimbări staged — captura NU e persistată (vizibil în Actions)"
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed storage capture (attempt $attempt/3)."
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::push respins (încercarea $attempt/3) — rebase + reîncerc"
+              git pull --rebase --autostash origin "$BRANCH" || {
+                echo "::error::rebase a eșuat la retry — captura orei NU a fost persistată (vizibil în Actions)"
+                git rebase --abort 2>/dev/null || true
+                exit 1
+              }
+              sleep 5
+            fi
+          done
+          echo "::error::push a eșuat după 3 încercări — captura orei NU a fost persistată (vizibil în Actions; cron-ul reia în ora următoare)"
+          exit 1

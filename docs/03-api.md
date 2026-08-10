@@ -6,6 +6,13 @@ Toate rutele sunt în `src/app/api/sen/`. Sunt `force-dynamic` (fără cache la 
 
 ## Endpoint-uri
 
+| Endpoint               | Rol                                                |
+| ---------------------- | -------------------------------------------------- |
+| `GET /api/sen`         | Date agregate într-un interval                     |
+| `GET /api/sen/summary` | KPI global precalculat                             |
+| `GET /api/sen/storage` | Stocare (ISPOZ): valoare curentă + serie acumulată |
+| `GET /api/sen/export`  | Export CSV                                         |
+
 ### `GET /api/sen` — date agregate într-un interval
 
 **Query params:**
@@ -55,6 +62,35 @@ GET /api/sen?granularity=raw        # va face downsample la ≤1200 puncte
 Fără parametri. Întoarce `data/sen-summary.json` (tip `SenSummaryResponse`) cu `latest`/`end`/`endTs`/`count` **actualizate din live** dacă Transelectrica are înregistrări mai noi (vezi `getLiveSummary`). Statisticile globale (`stats`, `balance`, `renewableShareAvg`) rămân cele precalculate — sunt pe tot istoricul.
 
 Folosit de pagina principală pentru KPI-uri și header, fără să încarce toate punctele.
+
+**Cache:** `public, s-maxage=120, stale-while-revalidate=600`.
+
+---
+
+### `GET /api/sen/storage` — stocare (ISPOZ)
+
+Fără parametri. Întoarce valoarea curentă de stocare + seria acumulată de capturi orare (tip `StorageApiResponse`, vezi [`types.ts`](../src/lib/sen/types.ts)):
+
+```json
+{
+  "current": { "t": "…", "ts": 0, "ispoz": 39, "source": "live" },
+  "history": [
+    { "t": "…", "ts": 0, "ispoz": 39 },
+    { "t": "…", "ts": 0, "ispoz": 41 }
+  ],
+  "fetchedAt": 1782930000000
+}
+```
+
+> Contract de timp (fix TO_FIX #6): `t` e wall-clock România etichetat UTC, iar `ts` e **epoch-ul UTC al valorii `t` etichetate** (la fel ca la datele SEN) — nu instant-ul local real.
+
+- `current` — snapshot-ul cel mai recent: fetch live la `/sen-filter` (TTL 10 min) sau, la eșec, **cea mai recentă valoare cunoscută**. `current.source` e proveniența valorii:
+  - `"live"` — snapshot de la `/sen-filter`, fie proaspăt (în TTL), fie **stale** (din cache, după expirarea TTL-ului — rămâne „live", nu „captură");
+  - `"capture"` — ultimul punct din istoricul acumulat (fallback pur, când nu există niciun snapshot live).
+    `null` doar dacă nu există încă nicio valoare cunoscută.
+- `fetchedAt` — momentul real în care a fost obținut `current`: > 0 pentru valorile live (chiar stale — timestamp-ul original), `0` pentru punctul din istoric (`source: "capture"`).
+- `history` — seria completă din `data/sen-storage.json`, ordonată cronologic (începe de la prima captură a workflow-ului `storage-capture`).
+- Folosit de `StorageCard` prin [`src/hooks/use-storage-data.ts`](../src/hooks/use-storage-data.ts) (query key `["sen","storage"]`, `staleTime 5 min`).
 
 **Cache:** `public, s-maxage=120, stale-while-revalidate=600`.
 

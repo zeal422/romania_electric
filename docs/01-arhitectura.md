@@ -22,9 +22,11 @@ Dashboard web pentru **Sistemul Energetic Național (SEN)** al României, constr
 │ Logică pură de date  src/lib/sen/                           │
 │   aggregate · stats · format · constants · types            │
 │   loader (fișiere, server-only) · live (fetch live, server) │
+│   storage (snapshot ISPOZ, server)                          │
 ├─────────────────────────────────────────────────────────────┤
 │ Date statice  data/sen-data.json + sen-summary.json         │
 │   (generate de scripts/convert-sen.py: xlsx + fetch live)   │
+│   data/sen-storage.json (capturi orare stocare, workflow)   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,25 +47,28 @@ Dashboard web pentru **Sistemul Energetic Național (SEN)** al României, constr
 
 ## Decizii cheie de arhitectură
 
-| Decizie                                                                   | Motiv                                                                                                                                                           |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Date statice JSON + date live la runtime**                              | Istoricul stă în JSON (cache singleton); `live.ts` adaugă datele live Transelectrica cu TTL 10 min și fallback la statice — fără bază de date, simplu și rapid. |
-| **`loader.ts` cu cache singleton**                                        | Citirea fișierului se face o singură dată per proces; API-urile devin foarte rapide.                                                                            |
-| **API-ul agreghează, clientul doar afișează**                             | Clientul primește puncte gata-agregate (raw/10m/oră/zi) — logica e testabilă și identică pentru toate vizualizările.                                            |
-| **Downsampling la 1.200 puncte** la granularitate `raw` pe intervale mari | Protejează browserul de desenarea a mii de puncte.                                                                                                              |
-| **Preset-urile de interval sunt relative la `endTs`**, nu la `now()`      | Datele au capăt variabil (ultima înregistrare — static + live); „24 ore" trebuie raportat la ultima înregistrare, nu la momentul curent.                        |
-| **`reactStrictMode: true` + fără `ignoreBuildErrors`**                    | Build-ul validează tipurile; Strict Mode descoperă bug-uri de render (fix-ul de hidratare e deja în loc, vezi [05-ui-dashboard.md](./05-ui-dashboard.md)).      |
-| **Interfața în română + formatare `Intl` ro-RO**                          | Publicul țintă e românesc; formatarea (spațiu mii, virgulă zecimale) e centralizată în `format.ts`.                                                             |
+| Decizie                                                                   | Motiv                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Date statice JSON + date live la runtime**                              | Istoricul stă în JSON (cache singleton); `live.ts` adaugă datele live Transelectrica cu TTL 10 min și fallback la statice — fără bază de date, simplu și rapid.                                                                                                                                                                                     |
+| **`loader.ts` cu cache singleton**                                        | Citirea fișierului se face o singură dată per proces; API-urile devin foarte rapide.                                                                                                                                                                                                                                                                |
+| **API-ul agreghează, clientul doar afișează**                             | Clientul primește puncte gata-agregate (raw/10m/oră/zi) — logica e testabilă și identică pentru toate vizualizările.                                                                                                                                                                                                                                |
+| **Downsampling la 1.200 puncte** la granularitate `raw` pe intervale mari | Protejează browserul de desenarea a mii de puncte.                                                                                                                                                                                                                                                                                                  |
+| **Preset-urile de interval sunt relative la `endTs`**, nu la `now()`      | Datele au capăt variabil (ultima înregistrare — static + live); „24 ore" trebuie raportat la ultima înregistrare, nu la momentul curent.                                                                                                                                                                                                            |
+| **`reactStrictMode: true` + fără `ignoreBuildErrors`**                    | Build-ul validează tipurile; Strict Mode descoperă bug-uri de render (fix-ul de hidratare e deja în loc, vezi [05-ui-dashboard.md](./05-ui-dashboard.md)).                                                                                                                                                                                          |
+| **Interfața în română + formatare `Intl` ro-RO**                          | Publicul țintă e românesc; formatarea (spațiu mii, virgulă zecimale) e centralizată în `format.ts`.                                                                                                                                                                                                                                                 |
+| **Stocarea (ISPOZ): istoric construit de noi, orar**                      | Transelectrica expune stocarea DOAR ca snapshot (`/sen-filter`), fără istoric. Workflow-ul `storage-capture` (cron orar) acumulează capturi în `data/sen-storage.json`; la runtime `storage.ts` întreabă snapshot-ul live (TTL 10 min) cu fallback la ultima captură. Vezi [02-pipeline-date.md](./02-pipeline-date.md) + [03-api.md](./03-api.md). |
 
 ## Fișierele principale
 
-| Fișier                                                            | Rol                                                                                                        |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| [`src/app/page.tsx`](../src/app/page.tsx)                         | Pagina principală: orchestrează filtre, KPI-uri, grafice, tabel                                            |
-| [`src/app/layout.tsx`](../src/app/layout.tsx)                     | Layout + metadata (ro) + providers                                                                         |
-| [`src/components/providers.tsx`](../src/components/providers.tsx) | ThemeProvider + QueryClientProvider                                                                        |
-| [`src/lib/sen/index.ts`](../src/lib/sen/index.ts)                 | Barrel export **client-safe** (logică pură, fără `node:fs`); `loader.ts` se importă direct, doar pe server |
-| [`src/lib/utils.ts`](../src/lib/utils.ts)                         | `cn()` — combinare clase Tailwind                                                                          |
+| Fișier                                                                                      | Rol                                                                                                        |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [`src/app/page.tsx`](../src/app/page.tsx)                                                   | Pagina principală: orchestrează filtre, KPI-uri, grafice, tabel                                            |
+| [`src/app/layout.tsx`](../src/app/layout.tsx)                                               | Layout + metadata (ro) + providers                                                                         |
+| [`src/components/providers.tsx`](../src/components/providers.tsx)                           | ThemeProvider + QueryClientProvider                                                                        |
+| [`src/lib/sen/index.ts`](../src/lib/sen/index.ts)                                           | Barrel export **client-safe** (logică pură, fără `node:fs`); `loader.ts` se importă direct, doar pe server |
+| [`src/lib/utils.ts`](../src/lib/utils.ts)                                                   | `cn()` — combinare clase Tailwind                                                                          |
+| [`src/lib/sen/storage.ts`](../src/lib/sen/storage.ts)                                       | Stocare (ISPOZ) — server-only: încarcă seria acumulată + fetch snapshot live cu TTL 10 min și fallback     |
+| [`src/components/dashboard/storage-card.tsx`](../src/components/dashboard/storage-card.tsx) | Mini-card „Stocare": valoare curentă + sparkline + trend (sidebar, lângă Mixul curent)                     |
 
 ## Cum navighezi mai departe
 

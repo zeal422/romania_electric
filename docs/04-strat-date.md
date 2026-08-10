@@ -6,15 +6,16 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 
 ## Fișiere
 
-| Fișier                                        | Conținut                                                                                                                                           |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`types.ts`](../src/lib/sen/types.ts)         | Tipuri TypeScript: `SenReading`, `SenField`, `SourceField`, `Granularity`, `AggregatedPoint`, `FieldStats`, `SenApiResponse`, `SenSummaryResponse` |
-| [`constants.ts`](../src/lib/sen/constants.ts) | Metadate surse: etichete RO, culori semantice, ordine de afișare, clasificare fosil/regenerabil                                                    |
-| [`aggregate.ts`](../src/lib/sen/aggregate.ts) | `mean`, `bucketKey`, `aggregate`, `filterByRange`, `downsample`                                                                                    |
-| [`stats.ts`](../src/lib/sen/stats.ts)         | `fieldStats`, `renewableShare`, `sourceShares`, `balanceStats`, `latestReading`                                                                    |
-| [`format.ts`](../src/lib/sen/format.ts)       | Formatare `Intl` ro-RO: numere, MW, sold, procente, date, ore                                                                                      |
-| [`loader.ts`](../src/lib/sen/loader.ts)       | Citire `data/*.json` — **server-only**, cache singleton (excepția de la „pur")                                                                     |
-| [`live.ts`](../src/lib/sen/live.ts)           | Date live Transelectrica — **server-only**: parse/merge pure + fetch cu TTL 10 min + fallback static                                               |
+| Fișier                                        | Conținut                                                                                                                                                                                 |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`types.ts`](../src/lib/sen/types.ts)         | Tipuri TypeScript: `SenReading`, `SenField`, `SourceField`, `Granularity`, `AggregatedPoint`, `FieldStats`, `SenApiResponse`, `SenSummaryResponse`, `StoragePoint`, `StorageApiResponse` |
+| [`constants.ts`](../src/lib/sen/constants.ts) | Metadate surse: etichete RO, culori semantice, ordine de afișare, clasificare fosil/regenerabil + `STORAGE_COLOR` (accentul stocării ISPOZ)                                              |
+| [`aggregate.ts`](../src/lib/sen/aggregate.ts) | `mean`, `bucketKey`, `aggregate`, `filterByRange`, `downsample`                                                                                                                          |
+| [`stats.ts`](../src/lib/sen/stats.ts)         | `fieldStats`, `renewableShare`, `sourceShares`, `balanceStats`, `latestReading`                                                                                                          |
+| [`format.ts`](../src/lib/sen/format.ts)       | Formatare `Intl` ro-RO: numere, MW, sold, procente, date, ore                                                                                                                            |
+| [`loader.ts`](../src/lib/sen/loader.ts)       | Citire `data/*.json` — **server-only**, cache singleton (excepția de la „pur")                                                                                                           |
+| [`live.ts`](../src/lib/sen/live.ts)           | Date live Transelectrica — **server-only**: parse/merge pure + fetch cu TTL 10 min + fallback static                                                                                     |
+| [`storage.ts`](../src/lib/sen/storage.ts)     | Stocare (ISPOZ) — **server-only**: serie acumulată (cache singleton) + snapshot live `/sen-filter` cu TTL 10 min + fallback la ultima captură                                            |
 
 ## `types.ts` — tipurile cheie
 
@@ -30,6 +31,7 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 - **`SOURCE_ORDER`** — ordinea de afișare pentru stacked area: `[carbune, hidrocarburi, nuclear, ape, biomasa, eolian, foto]` (fosilele jos, nuclearul imediat după fosile, apoi regenerabilele spre sus). **Este o ordine intenționată** — nu o reordona „ca să fie mai frumoasă".
 - **`RENEWABLE_FIELDS`** = `[ape, eolian, foto, biomasa]`; **`FOSSIL_FIELDS`** = `[carbune, hidrocarburi]`. **Nuclearul NU e regenerabil** (e low-carbon) și e exclus intenționat din calculul share-ului regenerabil — `SOURCES.nuclear.kind = "lowcarbon"`; vezi [06-design.md](./06-design.md).
 - **`SERIES_COLORS`** — culori pentru serii non-sursă (`consum` roșu, `productie` emerald, `medieConsum` violet, `soldPositive` roșu = import, `soldNegative` verde = export).
+- **`STORAGE_COLOR`** — accentul pentru stocare (ISPOZ, violetul oficial `#A582FF`). Nu e sursă de producție, deci stă separat de `SOURCES` — dar aceeași regulă: importat în componente, nu hardcodat (AGENTS §4.5).
 - **`READING_META`** — etichete + unități pentru toate câmpurile de citire.
 
 > **Regulă**: culorile și etichetele surselor se schimbă **doar aici**. Nu hardcoda hex-uri în componente. Vezi [06-design.md](./06-design.md) pentru detaliul culorilor.
@@ -70,6 +72,18 @@ Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci
 
 > **Important**: datele sursă sunt etichetate cu anul 2026 — le afișăm **fidel**, nu „corectăm” anul. **Valorile sursă sunt wall-clock (ora locală România, așa cum apar în fișierul Transelectrica), păstrate fidel — fără conversie EET/EEST — și etichetate ca UTC în ISO.** Funcțiile de formatare (`formatDateTime`, `formatDate`, `formatTime`) folosesc **getters UTC** (`getUTCHours`, `timeZone: "UTC"`) — nu înlocui cu getters locale, ar schimba ora afișată pe sisteme non-UTC.
 
+## `storage.ts` — stocare (ISPOZ, server-only)
+
+- `loadStorageHistory()` — seria acumulată din `data/sen-storage.json` (cache singleton, ordonată cronologic).
+- `extractIspoz(payload)` — extrage ISPOZ dintr-un payload `/sen-filter` (listă de `{cod: valoare}`), `null` dacă lipsește/nu e numeric/negativ/non-finit (NaN/Inf) sau e **gol/whitespace/`null`/array/hex-binary-underscore** (reject înainte de `Number()` printr-o regex de zecimale — paritate cu `float()` din Python; fix TO_FIX #8) (pură, testată).
+- `fetchCurrentIspoz()` — fetch la `/sen-filter` (timeout 5s); aruncă la eșec (pură de responsabilitate: `getStorageData` face fallback-ul).
+- `pickMostRecent(cached, last)` — alege cea mai recentă valoare cunoscută între snapshot-ul live stale (din cache) și ultima captură (pură, testată).
+- `getStorageData()` — `{current, history, fetchedAt}`: snapshot live cu **TTL 10 min** + **backoff 1 min** la eșec, **fallback la cea mai recentă valoare cunoscută** (cache-ul, chiar expirat, înaintea ultimei capturi). `current.source` e **proveniența**: `"live"` (snapshot de la `/sen-filter`, proaspăt sau stale) vs `"capture"` (punct din istoric) — UI-ul etichetează badge-ul după asta, iar un snapshot stale NU mai e prezentat greșit ca „captură". `fetchedAt` păstrează momentul real al valorii live (timestamp-ul original pentru stale), `0` doar pentru punctul din istoric. `t`-ul snapshot-ului respectă contractul de timp (wall-clock RO etichetat UTC, ca live.ts), iar `ts` e **epoch-ul UTC al valorii `t` etichetate** (`Date.parse(t)`) — nu instant-ul real, altfel ar fi cu 2-3h în urmă (fix TO_FIX #6). `loadStorageHistory` e tolerant la fișier lipsă/corupt (serie goală, nu 500). Site-ul nu se rupe dacă Transelectrica e indisponibilă.
+- `resetStorageCache()` — invalidare (teste).
+- ⚠️ **Doar server** (folosește `node:fs` + `fetch` server-side). Nu importa în componente client.
+
+> **De ce istoricul stocării e „construit de noi"**: Transelectrica expune ISPOZ doar ca snapshot curent, fără istoric. Seria se acumulează orar prin workflow-ul `storage-capture` (vezi [02-pipeline-date.md](./02-pipeline-date.md) §6).
+
 ## `loader.ts` — citire date (server-only)
 
 - `loadReadings()` / `loadSummary()` — cache singleton (un singur `readFile` per proces).
@@ -79,7 +93,7 @@ Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci
 
 ## Cum testezi
 
-- Testele sunt în `tests/sen/*.test.ts` și acoperă `aggregate`, `stats`, `format`, `live` (90 teste).
+- Testele sunt în `tests/sen/*.test.ts` (+ `tests/storage.test.ts` + `tests/capture-storage.test.ts`) și acoperă `aggregate`, `stats`, `format`, `live`, `storage` și logica Python de captură (`--capture-storage`).
 - După modificări în aceste fișiere, rulează `bun test` + `bun run typecheck`.
 - Dacă ai modificat codul (sau documentația), actualizează documentele acoperite de modificare și rulează `bun run docs:mark-verified` ca să le marchezi ca fiind la zi.
 - Verificarea finală: `bun run check` întreg (format → docs → lint → typecheck → teste → build).

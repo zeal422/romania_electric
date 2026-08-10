@@ -118,6 +118,21 @@ export const SERIES_COLORS = {
   soldNegative: "#16a34a", // green-600 (export)
 } as const;
 
+/**
+ * Culoarea accent pentru stocare (ISPOZ — „Instalații de stocare”).
+ * Nu e o sursă de producție, deci stă separat de `SOURCES` — dar aceeași
+ * regulă ca pentru surse: un singur loc pentru hex, importat în componente
+ * (AGENTS §4.5). E violetul oficial ISPOZ de pe widget-ul Transelectrica.
+ */
+export const STORAGE_COLOR = "#A582FF";
+
+/**
+ * Pragul de trend pentru cardul de stocare (MW): |Δ| sub prag = „Stabil”,
+ * peste = „Încărcare” (+) / „Descărcare” (−). Centralizat ca toate constantele
+ * UI (AGENTS §4.5) — nu hardcoda în componente.
+ */
+export const STORAGE_TREND_THRESHOLD_MW = 0.5;
+
 export const READING_FIELDS = [
   "consum",
   "medieConsum",

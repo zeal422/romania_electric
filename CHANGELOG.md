@@ -6,6 +6,84 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.11] — 2026-08-10, 11:22 EEST
+
+### Reparat
+
+- **Branch-ul țintă pentru rebase/push în workflow-uri folosea `git branch --show-current`, gol pe detached checkout** (TO_FIX F-1): `actions/checkout@v4` face checkout la SHA (detached HEAD), deci comanda întorcea șir gol → fallback pe `main`. Pe cron mergea corect (default branch), dar la `workflow_dispatch` manual pe un branch non-main (ex: `updates`), rebase-ul și push-ul ar fi țintit greșit `main`. Fix în `storage-capture.yml` și `data-refresh.yml`: `BRANCH="${GITHUB_REF_NAME:-main}"` — variabila GitHub e setată corect chiar și pe detached checkout (default branch la `schedule`, branch-ul selectat la `workflow_dispatch`).
+- **Pragul de trend al cardului de stocare era hardcodat în componentă** (TO_FIX F-2): `0.5` (MW) apărea direct în `storage-card.tsx` pentru eticheta/iconița de trend, nu în `constants.ts`. Mutat în `STORAGE_TREND_THRESHOLD_MW` (în `constants.ts`, alături de `STORAGE_COLOR`) și importat în card — inclusiv a treia apariție a pragului din culoarea textului, pe care auditul nu o listase. Regula aplicabilă e AGENTS §4.5 (sursa unică pentru surse și constante de business — extinsă explicit cu ocazia acestui fix ca să acopere și constantele numerice, nu doar culorile/etichetele). Zero schimbare de comportament (aceeași valoare).
+- **Comentariul `STORAGE_TTL_MS` sugera o relație inexistentă** (TO_FIX F-3): „10 minute — frecvența de captură a workflow-ului" — dar captura `storage-capture` e orară (1/h), iar TTL-ul de 10 min e doar pentru snapshot-ul live la `/sen-filter`. Comentariu reformulat ca să distingă clar cele două (TTL live vs captură orară independentă).
+
+## [0.3.10] — 2026-08-10, 08:30 EEST
+
+### Reparat
+
+- **Sparkline-ul cardului de stocare se scala cu lățimea cardului în loc să aibă înălțimea fixă de 48px** (TO_FIX F5): `<svg className="h-full w-full">` își rezolva `height: 100%` contra unui wrapper `div.mt-4` fără înălțime explicită → cădea pe aspect-ratio-ul viewBox-ului (100:48), deci pe un card de ~320px sparkline-ul randa la ~153px. Fix: `h-12` (48px) pe wrapper-ul din `storage-card.tsx` — `h-full` se rezolvă acum la 48px, `viewBox`/`preserveAspectRatio` neschimbate (proporții identice). Verificat empiric în Chrome: fără fix 153.6px → cu fix 48px.
+
+## [0.3.9] — 2026-08-10, 07:48 EEST
+
+### Reparat
+
+- **`continue-on-error: true` masca erorile reale din workflow-uri** (TO_FIX F2): step-urile de fetch din `storage-capture.yml` și `data-refresh.yml` raportau orice eroare de script ca simplu warning, iar rularea rămânea verde — problemele persistente (bug de script, eroare de scriere) treceau neobservate. Eliminat: un eșec tranzitoriu de rețea e deja tolerat **intern de script** (`capture_storage` / `fetch_live` prind `URLError`/`Exception` și ies cu 0 → step-ul de commit nu găsește schimbări), iar o eroare reală iese acum non-zero → vizibilă în Actions.
+- **Timestamp-ul valorii live de stocare era decalat cu durata fetch-ului** (TO_FIX F3): `getStorageData` construia `t`/`fetchedAt` din `now`-ul capturat **înainte** de `await inflightFetch` — la un fetch lent (până la 5s), ora afișată și baza TTL-ului de 10 min erau cu câteva secunde în urmă. Acum momentul e recalculat după fetch.
+- **`Sparkline` recalcula `gid`/`path` la fiecare render** (TO_FIX F4): array-ul `points` era recreat la fiecare render (`history.map(...)`), făcând `useMemo`-urile din `Sparkline` ineficiente. Acum `points` e memoizat pe referința stabilă `history`.
+
+## [0.3.8] — 2026-08-10, 06:36 EEST
+
+### Reparat
+
+- **Eșecurile reale de persistare ale workflow-urilor erau raportate ca succes** (TO_FIX #1-3): `storage-capture.yml` și `data-refresh.yml` ieșeau cu `exit 0` („verde") la rebase eșuat, commit eșuat cu schimbări staged și push epuizat după 3 încercări — monitoring-ul nu vedea niciodată problemele de sincronizare. Acum:
+  - **Rebase eșuat** (inițial + la retry) → `exit 1` (workflow-ul devine roșu în Actions). Recuperarea diferă între workflow-uri: la **data-refresh** datele se recuperează la următoarea rulare (fetch-ul e incremental de la `last_ts`, deci backfill posibil); la **storage-capture** snapshot-ul orei pierdute e **irecuperabil** (următoarea captură e o valoare nouă — nu reconstruiește ora eșuată), motiv pentru care eșecul trebuie să fie vizibil.
+  - **Commit eșuat cu schimbări staged** → `::error::` + `exit 1` (nu mai e mascat ca „Nothing to commit"); „Nothing to commit" se raportează doar când `git diff --cached --quiet` e gol.
+  - **Push epuizat după 3 încercări** → `::error::` + `exit 1` (era `exit 0`).
+  - Auto-heal-ul (reluarea automată la următorul cron — nu reconstruiește ora pierdută la storage-capture, vezi mai sus) și curățarea (`git rebase --abort`) rămân identice — s-a schimbat doar exit code-ul pe căile de eșec real.
+
+## [0.3.7] — 2026-08-10, 05:52 EEST
+
+### Reparat
+
+- **Timestamp-ul capturilor de stocare era cu 2-3h în urmă față de eticheta `t`** (TO_FIX #6): `capture_storage` din `scripts/convert-sen.py` și snapshot-ul live din `storage.ts` calculau `ts` ca **instant-ul local real** (`now.timestamp()`), dar `t` e wall-clock România **etichetat UTC** — cele două nu se potriveau (ex: `t` zicea `18:18Z` dar `ts` corespundea lui `15:18Z`), inconsistente cu restul pipeline-ului (fake-UTC, vezi `parse_ts`/`make_record`). Acum ambele folosesc **epoch-ul UTC al valorii etichetate** (`parse_ts` în Python, `Date.parse(t)` în TS). Punctele existente din `data/sen-storage.json` au fost migrate (`ts = epoch(t)`).
+- **`extractIspoz` accepta gol/whitespace/null/array ca 0** (TO_FIX #8): `Number("") === 0`, `Number(null) === 0`, `Number([]) === 0` — un payload cu `ISPOZ: ""` (sau `null`, `[]`) era tratat ca „stocare 0 MW" în loc de invalid. Acum aceste valori sunt respinse **înainte** de `Number()`, consistent cu `extract_ispoz` din Python (care le respinge prin excepție). Bonus de paritate cu `float()`: și string-urile hex/binary/octal (`"0x10"`, `"0b101"`) sau cu underscore (`"1_000"`) — pe care `Number()` le-ar accepta — sunt respinse (regex de zecimale), ca Python.
+- **`merge_storage` crăpa cu KeyError la un record cu `t` dar fără `ts`** (TO_FIX #5): `sorted(..., key=lambda x: x["ts"])` arunca pe un fișier valid JSON dar cu un record corupt. Acum record-urile fără `ts` sunt excluse la construirea seriei — toleranță la fel de strictă ca `load_existing_storage`.
+- **Badge-ul „Stocare" arăta „ultima captură" când nu exista nicio valoare** (TO_FIX #7): cu `current === null` (fără istoric ȘI fără live), badge-ul afișa „ultima captură" — fals. Acum afișează „se încarcă" în timpul loading-ului și „nicio captură" pentru no-data; „live" doar pentru `source === "live"`.
+- **Push-ul workflow-urilor putea pierde un commit la respingere non-fast-forward** (TO_FIX #1): `storage-capture.yml` și `data-refresh.yml` făceau un singur `git push` după rebase — dacă celălalt workflow împingea între rebase și push, captura/ziua se pierdea. Acum push-ul are **retry (3 încercări)**: la respingere reface rebase pe remote și reîncearcă; auto-heal doar după epuizarea încercărilor sau la rebase eșuat.
+- **README: ordinea fallback-ului stocării documentată** (TO_FIX #3): live → snapshot live stale din cache → ultima captură (nu doar „fallback la ultima captură").
+
+### Documentat
+
+- **Cele 2 teste union-type din `tests/local-preference.test.ts`** (TO_FIX #2): adăugate la fix-ul de tipuri `readLocalPreference` (între 0.3.4 și 0.3.5), nu erau menționate în nicio intrare. Intrarea 0.3.5 e corectată: 101 (0.3.4) + 2 union-type + 12 storage = **115**, iar 0.3.6 a adăugat 14 → **129** (totalul real verificat).
+- **Tabelul din `docs/05-ui-dashboard.md` reparat** (TO_FIX #4): rândul `Header` conținea conținutul lui `Filters` înghesuit pe aceeași linie (7 celule într-un tabel cu 3 coloane) — împărțit în două rânduri complete.
+
+### Adăugat
+
+- **1 test unitar nou** (total: **130**): `extractIspoz` reject gol/whitespace/null/array + hex/binary/underscore (valori valide rămân acceptate, inclusiv exponent `1e3`). Asserts noi în teste existente: `current.ts === Date.parse(current.t)` la snapshot-ul live (`storage.test.ts`), `merge_storage` tolerant la record fără `ts` + `ts == epoch(t)` end-to-end (`capture-storage.test.ts`).
+
+## [0.3.6] — 2026-08-09, 19:40 EEST
+
+### Reparat
+
+- **Workflow-urile de date puteau pierde un commit la push respins** (review MyRabbit P3-001): `storage-capture.yml` (cron orar) și `data-refresh.yml` (cron zilnic) făceau `git commit` + `git push` fără un `git pull` înainte — dacă cele două rulează în paralel pe aceeași ramură (ex: 03:00 și 03:30 UTC), push-ul e respins ca non-fast-forward și captura orei/ziua se pierdea. Acum ambele fac `git pull --rebase --autostash` înainte de commit+push; la eșec de rebase amână actualizarea (auto-heal la rularea următoare), nu riscă un push respins.
+- **Badge-ul „Stocare" eticheta greșit un snapshot live stale ca „ultima captură"** (P3-002): când fetch-ul la `/sen-filter` eșua și TTL-ul expirase, `getStorageData` întorcea snapshot-ul din cache cu `fetchedAt: 0` → UI-ul îl prezenta ca „ultima captură", deși era o valoare live veche. Acum `current.source` e **proveniența** valorii: `"live"` (snapshot de la `/sen-filter`, proaspăt sau stale, cu `fetchedAt`-ul original > 0) vs `"capture"` (punct din istoric, `fetchedAt: 0`); funcția pură `pickMostRecent` alege cea mai recentă valoare cunoscută.
+- **Captura în aceeași secundă cu valoare schimbată se pierdea** (P3-003, logica din `scripts/convert-sen.py`): dedupe-ul pe `t` (secundă) compara doar cheia, nu valoarea — o rulare în aceeași secundă cu ISPOZ diferit era tratată ca „deja la zi" și update-ul era aruncat. `merge_storage` compară acum și valoarea: aceeași secundă + valoare diferită → suprascrie.
+- **Logica Python de captură nu avea niciun test automat** (P2-001): dedupe, parse JSON, reject negative/NaN și sortarea erau netestate (repo-ul testează doar TS). Acum `extract_ispoz`/`merge_storage`/`load_existing_storage` sunt funcții pure, iar `tests/capture-storage.test.ts` le rulează real (import + flux end-to-end cu mock server HTTP și fișiere temporare prin `SEN_STORAGE_URL`/`SEN_STORAGE_OUT` — datele reale din `data/` nu sunt atinse). `extract_ispoz` respinge și **NaN/Inf** (un check doar pe `< 0` le-ar fi lăsat să treacă).
+- **Culoarea stocării era hardcodată în componentă** (P3-004): `#A582FF` stătea în `storage-card.tsx`, încălcând regula AGENTS §4.5 (hex-urile doar în `constants.ts`). Mutată în `STORAGE_COLOR` din `constants.ts`, importată în card.
+
+### Adăugat
+
+- **14 teste unitare noi** (total: **129**): `tests/capture-storage.test.ts` — 9 teste pentru logica Python de captură (extract_ispoz: numeric/lipsă/non-numeric/negativ/NaN/Inf/non-list; merge_storage: punct nou + sortare, dedupe aceeași secundă, suprascriere la valoare diferită, curățare duplicate vechi; end-to-end: scriere corectă, payload invalid/ISPOZ lipsă → neatinse, eșec de rețea → grațios, fișier corupt/non-list → restart curat) + 5 teste noi în `tests/storage.test.ts` (`source` corect pe live/capture, `pickMostRecent` pe cele 3 cazuri).
+
+## [0.3.5] — 2026-08-09, 18:24 EEST
+
+### Adăugat
+
+- **Stocare (ISPOZ — „Instalații de stocare")**: Transelectrica expune stocarea doar ca snapshot curent (`/sen-filter`), fără istoric. Construim noi seria:
+  - **Captură orară** — modul `--capture-storage` în `scripts/convert-sen.py` (fetch `/sen-filter`, extrage `ISPOZ`, append cu **dedupe pe `t`** — fișiere cu duplicate vechi sunt curățate, rulări în aceeași secundă nu creează duplicate) → `data/sen-storage.json`; workflow nou `.github/workflows/storage-capture.yml` (cron orar `0 * * * *`, commit doar la schimbare).
+  - **Runtime** — `src/lib/sen/storage.ts` (server-only): încarcă seria acumulată (cache singleton) + fetch snapshot live cu TTL 10 min, fallback la ultima captură și backoff 1 min la eșec; endpoint nou `GET /api/sen/storage` (`src/app/api/sen/storage/route.ts`).
+  - **UI** — `StorageCard` (`src/components/dashboard/storage-card.tsx`) în sidebar, lângă „Mixul curent": valoare curentă (MW), trend față de ultima captură (încărcare/descărcare/stabil), sparkline SVG cu seria acumulată; hook `useStorageData` (`src/hooks/use-storage-data.ts`). Culoare accent = violetul oficial ISPOZ (`#A582FF`).
+- **Tipuri noi** în `types.ts`: `StoragePoint` + `StorageApiResponse`.
+- **14 teste unitare noi** (total: **115**): 12 în `tests/storage.test.ts` (`extractIspoz` (payload valid/lipsă/invalid/non-array), `loadStorageHistory` (serie reală, sortată), `fetchCurrentIspoz` (fetch mock-uit: succes, HTTP non-OK, fără ISPOZ), `getStorageData` (snapshot live + istoric, cache TTL → un singur fetch la apeluri repetate, fallback la ultima captură fără throw, backoff după eșec)) + **2 în `tests/local-preference.test.ts`** (acoperirea union-type a lui `readLocalPreference`: fără validator → `string` brut; cu type predicate → `T` confirmat — adăugate la fix-ul de tipuri aplicat între 0.3.4 și 0.3.5). Matematica: 101 (0.3.4) + 2 + 12 = **115**.
+- **Docs + README + CHANGELOG**: documentate captura orară, endpoint-ul `/api/sen/storage`, modulul `storage.ts`, cardul UI, workflow-ul nou; manifest `docs/.docs-manifest.json` extins cu fișierele noi.
+
 ## [0.3.4] — 2026-08-09, 17:23 EEST
 
 ### Adăugat

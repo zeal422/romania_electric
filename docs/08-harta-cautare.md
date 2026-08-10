@@ -6,19 +6,21 @@
 
 ### Date & logică
 
-| Întrebare                                                       | Fișier                                                                                                       |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Unde e structura unei înregistrări (ce câmpuri are)?            | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `SenReading`                                             |
-| Cum se agregă datele pe bucket-uri (10m/oră/zi)?                | [`src/lib/sen/aggregate.ts`](../src/lib/sen/aggregate.ts)                                                    |
-| Cum se calculează media/statistici/pondere regenerabil/balanță? | [`src/lib/sen/stats.ts`](../src/lib/sen/stats.ts)                                                            |
-| Cum se formatează numerele/datele în ro-RO?                     | [`src/lib/sen/format.ts`](../src/lib/sen/format.ts)                                                          |
-| Ce culori/etichete au sursele de energie?                       | [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts)                                                    |
-| De unde citesc serverul datele (JSON)?                          | [`src/lib/sen/loader.ts`](../src/lib/sen/loader.ts)                                                          |
-| Ce granularități există?                                        | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `Granularity` + `GRANULARITIES` (sursă unică)            |
-| Care sunt granularitățile compatibile cu un preset?             | `granularitiesForPreset` în [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) (sursă unică UI + normalizare) |
-| Cum se convertește xlsx-ul în JSON?                             | [`scripts/convert-sen.py`](../scripts/convert-sen.py)                                                        |
-| Unde sunt datele?                                               | `data/sen-data.json`, `data/sen-summary.json`                                                                |
-| De unde vine fișierul sursă?                                    | `upload/Grafic_SEN.xlsx`                                                                                     |
+| Întrebare                                                       | Fișier                                                                                                                                          |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unde e structura unei înregistrări (ce câmpuri are)?            | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `SenReading`                                                                                |
+| Cum se agregă datele pe bucket-uri (10m/oră/zi)?                | [`src/lib/sen/aggregate.ts`](../src/lib/sen/aggregate.ts)                                                                                       |
+| Cum se calculează media/statistici/pondere regenerabil/balanță? | [`src/lib/sen/stats.ts`](../src/lib/sen/stats.ts)                                                                                               |
+| Cum se formatează numerele/datele în ro-RO?                     | [`src/lib/sen/format.ts`](../src/lib/sen/format.ts)                                                                                             |
+| Ce culori/etichete au sursele de energie?                       | [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts)                                                                                       |
+| De unde citesc serverul datele (JSON)?                          | [`src/lib/sen/loader.ts`](../src/lib/sen/loader.ts)                                                                                             |
+| Ce granularități există?                                        | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `Granularity` + `GRANULARITIES` (sursă unică)                                               |
+| Care sunt granularitățile compatibile cu un preset?             | `granularitiesForPreset` în [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) (sursă unică UI + normalizare)                                    |
+| Cum se convertește xlsx-ul în JSON?                             | [`scripts/convert-sen.py`](../scripts/convert-sen.py)                                                                                           |
+| Unde sunt datele?                                               | `data/sen-data.json`, `data/sen-summary.json`                                                                                                   |
+| De unde vine fișierul sursă?                                    | `upload/Grafic_SEN.xlsx`                                                                                                                        |
+| Unde e logica de stocare (ISPOZ)?                               | [`src/lib/sen/storage.ts`](../src/lib/sen/storage.ts) (server-only) + [`scripts/convert-sen.py`](../scripts/convert-sen.py) `--capture-storage` |
+| Unde e seria capturată de stocare?                              | `data/sen-storage.json` (generată orar de workflow-ul `storage-capture`)                                                                        |
 
 ### API
 
@@ -27,6 +29,7 @@
 | Ce face `GET /api/sen`?         | [`src/app/api/sen/route.ts`](../src/app/api/sen/route.ts)                 |
 | Ce face `GET /api/sen/summary`? | [`src/app/api/sen/summary/route.ts`](../src/app/api/sen/summary/route.ts) |
 | Ce face `GET /api/sen/export`?  | [`src/app/api/sen/export/route.ts`](../src/app/api/sen/export/route.ts)   |
+| Ce face `GET /api/sen/storage`? | [`src/app/api/sen/storage/route.ts`](../src/app/api/sen/storage/route.ts) |
 | Cum apelează clientul API-ul?   | [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts)               |
 
 ### UI
@@ -37,6 +40,8 @@
 | Cum arată KPI-urile?                                                  | [`src/components/dashboard/kpi-cards.tsx`](../src/components/dashboard/kpi-cards.tsx)                                                                                                |
 | Cum arată graficul principal (mix pe surse)?                          | [`src/components/dashboard/production-mix-chart.tsx`](../src/components/dashboard/production-mix-chart.tsx)                                                                          |
 | Cum arată donut-ul cu mixul curent?                                   | [`src/components/dashboard/source-distribution.tsx`](../src/components/dashboard/source-distribution.tsx)                                                                            |
+| Cum arată cardul de stocare (ISPOZ)?                                  | [`src/components/dashboard/storage-card.tsx`](../src/components/dashboard/storage-card.tsx)                                                                                          |
+| De unde ia cardul de stocare datele?                                  | [`src/hooks/use-storage-data.ts`](../src/hooks/use-storage-data.ts) → `GET /api/sen/storage`                                                                                         |
 | Cum arată consum vs producție?                                        | [`src/components/dashboard/demand-supply-chart.tsx`](../src/components/dashboard/demand-supply-chart.tsx)                                                                            |
 | Cum arată balanța import/export?                                      | [`src/components/dashboard/balance-chart.tsx`](../src/components/dashboard/balance-chart.tsx)                                                                                        |
 | Cum arată tabelul de date?                                            | [`src/components/dashboard/data-table.tsx`](../src/components/dashboard/data-table.tsx)                                                                                              |
@@ -57,11 +62,11 @@
 
 ### Teste & tooling
 
-| Întrebare                  | Fișier                                                                                                |
-| -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Unde sunt testele unitare? | [`tests/sen/`](../tests/sen/) + [`tests/local-preference.test.ts`](../tests/local-preference.test.ts) |
-| Cum rulez tot CI-ul?       | `package.json` → scriptul `check`                                                                     |
-| Cum verific hidratarea?    | [`scripts/check-hydration.sh`](../scripts/check-hydration.sh)                                         |
+| Întrebare                  | Fișier                                                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unde sunt testele unitare? | [`tests/sen/`](../tests/sen/) + [`tests/local-preference.test.ts`](../tests/local-preference.test.ts) + [`tests/storage.test.ts`](../tests/storage.test.ts) + [`tests/capture-storage.test.ts`](../tests/capture-storage.test.ts) |
+| Cum rulez tot CI-ul?       | `package.json` → scriptul `check`                                                                                                                                                                                                 |
+| Cum verific hidratarea?    | [`scripts/check-hydration.sh`](../scripts/check-hydration.sh)                                                                                                                                                                     |
 
 ### Documentație
 
@@ -78,7 +83,7 @@
 2. **Logica de date e pură** — nu adăuga side-effects în `aggregate/stats/format`.
 3. **Datele din `data/` sunt generate** — nu le edita manual.
 4. **UI-ul e în română** — nu introduce text în engleză.
-5. **Culorile surselor doar în `constants.ts`** — nu hardcoda hex în componente.
+5. **Culorile surselor doar în `constants.ts`** — nu hardcoda hex în componente (inclusiv `STORAGE_COLOR` pentru stocare).
 6. **Granularități doar `raw|10m|hour|day`**.
 7. **Timestamps 2026 = fidel, nu „corecta”**.
 8. După orice modificare: **`bun run check`**.
