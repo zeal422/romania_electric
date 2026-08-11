@@ -112,6 +112,20 @@ Regula de bază: dacă vrei să schimbi ceva legat de **date** → `src/lib/sen/
 - **Dacă utilizatorul l-a pornit, NU-l opri** — e mediul lui de lucru; folosește-l și lasă-l așa.
 - Motiv: `bun run check:hydration` și verificările vizuale în browser au nevoie de serverul de dev pornit, dar procesele orfane blochează portul 3000 și încurcă rulările următoare.
 
+### 4.11. Nu edita fără permisiune explicită
+
+Citirea, explorarea, planificarea și propunerea de schimbări sunt **mereu permise**. Atingerea fișierelor cere un **„dă-i drumul" clar** din partea utilizatorului. O permisiune vagă („citește-l", „ce părere ai?") **nu** e permisiune de editare, iar aprobarea pentru o sarcină nu se extinde automat la următoarea.
+
+**Însă nu cere permisiune pe care o ai deja**: dacă utilizatorul a zis „dă-i drumul" pentru o sarcină anume, execut-o cap-coadă, fără să întrebi „continui?" între pași. Dacă scopul se extinde, oprește-te și confirmă. Restricțiile permanente — nu porni serverul fără aprobare (§4.10), nu face commit-uri (§6) — rămân în vigoare și nu sunt permisiuni implicite.
+
+### 4.12. Grep-ul nu e o concluzie; verifică claims înainte să le scrii
+
+Grep-ul e un **indicator**, nu un adevăr. După un grep, **deschide codul la locația citată și verifică** înainte de a trata orice afirmație ca fapt. Orice claim factual scris în cod, documentație sau mesaj de commit (nume de funcție, număr de linie, descriere a comportamentului) **trebuie verificat contra fișierului sursă** înainte de a fi scris. Planurile și presupunerile nu sunt „ground truth". (Se leagă de §7: nu presupune că găsirile dintr-o listă sunt valide — verifică-le.)
+
+### 4.13. Semnalează orice problemă, indiferent de origine
+
+Un test eșuat, o documentație învechită sau un gap de securitate sunt probleme indiferent dacă au fost introduse azi sau acum șase luni. **Nu respinge problemele pre-existente** ca „nu e al meu". (Principiul există deja în §7.2 — aici îl facem explicit și transversal.)
+
 ## 5. Lucruri de evitat (mistakes comune)
 
 - ❌ Folosirea `npm install` / `pnpm` — proiectul e pe **Bun** (`bun.lock`).
@@ -141,6 +155,11 @@ Regula de bază: dacă vrei să schimbi ceva legat de **date** → `src/lib/sen/
 ```
 
 Tipuri valide: `feat` (funcționalitate nouă), `fix` (corectură), `docs` (documentație), `refactor`, `chore` (curățenie/întreținere), `test`, `perf`. Titlul = o frază scurtă (max ~72 caractere). Corpul cu `-` listează fiecare schimbare notabilă (modul nou, fix, workflow, documentație, teste, curățenie) — nu rezuma, enumeră. Mesajul se oferă **doar la cerere**; agentul nu face commit-uri niciodată.
+
+8. **Gândește înainte de a scrie**: enunță-ți presupunerile explicit. Dacă există interpretări multiple, prezintă-le — nu alege singur în tăcere. Dacă există o abordare mai simplă, propune-o. Dacă ceva e neclar, oprește-te și întreabă.
+9. **Simplitate întâi**: scrie minimul de cod care rezolvă problema utilizatorului. Nu adăuga funcționalități speculative, configurabilitate inutilă sau abstracții pentru cod cu un singur consumator. (Consistent cu §5 — „nu adăuga o dependență fără să fie necesară".)
+10. **Schimbări chirurgicale**: atinge doar ce trebuie. Nu „îmbunătăți" codul adiacent, comentariile sau formatarea decât dacă ți s-a cerut explicit. Fiecare linie schimbată se leagă direct de cererea utilizatorului. Curăță-ți propriile artefacte orfane, dar lasă codul mort pre-existent în pace — anunță utilizatorul.
+11. **Execuție orientată spre obiective verificabile**: transformă sarcinile în obiective demonstrabile (ex: „scrie un test care reproduce bug-ul, apoi fă-l să treacă") și iterează independent până când obiectivul e verificat.
 
 ## 7. Workflow pentru verificarea cererilor de fix (ex: `TO_FIX.md`)
 
