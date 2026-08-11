@@ -149,6 +149,22 @@
   background-attachment: fixed;
 }
 
+@utility glass-card {
+  @apply backdrop-blur-md bg-card/70 border border-border/70 shadow-sm dark:border-t-white/10 dark:shadow-black/20;
+}
+
+@utility glass-header {
+  @apply backdrop-blur-xl bg-background/80 border-b border-border/50 shadow-xs;
+}
+
+@utility glass-tooltip {
+  @apply backdrop-blur-lg bg-card/90 border border-border/80 shadow-2xl;
+}
+
+@utility glass-panel {
+  @apply backdrop-blur-md bg-card/50 border border-border/60;
+}
+
 @layer utilities {
   .tnum {
     font-variant-numeric: tabular-nums;
@@ -193,4 +209,45 @@
 }
 .recharts-text {
   fill: var(--muted-foreground);
+}
+
+/* Recharts Hover Highlight - Tranziții CSS hardware-accelerated fără re-randări React */
+body[data-hovered-source] .recharts-area-area,
+body[data-hovered-source] .recharts-area-curve {
+  transition:
+    opacity 0.2s ease-in-out,
+    fill-opacity 0.2s ease-in-out,
+    stroke-opacity 0.2s ease-in-out,
+    stroke-width 0.2s ease-in-out;
+  fill-opacity: 0.15 !important;
+  stroke-opacity: 0.2 !important;
+}
+
+body[data-hovered-source="carbune"] .area-carbune path,
+body[data-hovered-source="hidrocarburi"] .area-hidrocarburi path,
+body[data-hovered-source="nuclear"] .area-nuclear path,
+body[data-hovered-source="ape"] .area-ape path,
+body[data-hovered-source="biomasa"] .area-biomasa path,
+body[data-hovered-source="eolian"] .area-eolian path,
+body[data-hovered-source="foto"] .area-foto path {
+  fill-opacity: 1 !important;
+  stroke-opacity: 1 !important;
+  stroke-width: 2px !important;
+}
+
+body[data-hovered-source] .recharts-pie-sector {
+  transition:
+    opacity 0.2s ease-in-out,
+    fill-opacity 0.2s ease-in-out;
+  fill-opacity: 0.25 !important;
+}
+
+body[data-hovered-source="carbune"] .pie-carbune,
+body[data-hovered-source="hidrocarburi"] .pie-hidrocarburi,
+body[data-hovered-source="nuclear"] .pie-nuclear,
+body[data-hovered-source="ape"] .pie-ape,
+body[data-hovered-source="biomasa"] .pie-biomasa,
+body[data-hovered-source="eolian"] .pie-eolian,
+body[data-hovered-source="foto"] .pie-foto {
+  fill-opacity: 1 !important;
 }

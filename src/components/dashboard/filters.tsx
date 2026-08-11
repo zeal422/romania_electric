@@ -68,7 +68,7 @@ export function Filters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-card/60 p-1">
+      <div className="glass-panel flex flex-wrap items-center gap-1 rounded-xl p-1 shadow-2xs">
         {RANGE_PRESETS.map((p) => {
           // Dezactivăm preset-uri care depășesc intervalul disponibil
           const tooLarge = p.msBack !== null && endTs - p.msBack < startTs;
@@ -79,12 +79,11 @@ export function Filters({
               disabled={tooLarge}
               onClick={() => onPresetChange(p.id)}
               className={cn(
-                "h-8 rounded-md px-3 text-xs font-medium transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
+                "h-8 rounded-lg px-3 text-xs font-medium transition-all duration-200",
                 "disabled:cursor-not-allowed disabled:opacity-40",
                 activePreset === p.id
-                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground"
-                  : "text-muted-foreground",
+                  ? "bg-primary text-primary-foreground shadow-xs shadow-primary/25 hover:bg-primary/90"
+                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
               )}
             >
               {p.label}
@@ -94,11 +93,14 @@ export function Filters({
       </div>
 
       <Select value={granularity} onValueChange={(v) => onGranularityChange(v as Granularity)}>
-        <SelectTrigger size="sm" className="h-9 w-[150px] text-xs">
+        <SelectTrigger
+          size="sm"
+          className="glass-panel h-9 w-[150px] border-border/70 text-xs shadow-2xs backdrop-blur-xs"
+        >
           <span className="text-muted-foreground">Granularitate:</span>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="glass-tooltip backdrop-blur-md">
           {GRANULARITIES.map((g) => (
             <SelectItem
               key={g}
@@ -116,7 +118,7 @@ export function Filters({
         variant="outline"
         size="sm"
         onClick={handleExport}
-        className="h-9 gap-1.5 text-xs"
+        className="glass-panel h-9 gap-1.5 border-border/70 text-xs shadow-2xs backdrop-blur-xs hover:border-border hover:bg-accent/50"
         aria-label="Exportă datele din intervalul curent ca CSV"
       >
         <Download className="h-3.5 w-3.5" />

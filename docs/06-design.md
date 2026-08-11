@@ -28,7 +28,7 @@ Variabilele sunt expuse ca token-uri Tailwind prin `@theme inline` (`--color-bac
 
 - Folosește **întotdeauna** variabilele Tailwind/semantice (`bg-card`, `text-muted-foreground`, `border-border`) — nu hex/oklch hardcodate pentru fundaluri și text.
 - Singura excepție: culorile **seriilor de date** (hex în `constants.ts`, vezi mai jos) — astea sunt identice în ambele temi intenționat.
-- Stiluri globale live în `@layer base` (body, scrollbar) și `@layer utilities` (`.tnum`). Clasele de fundal `bg-aura-dark`/`bg-aura-light` sunt înregistrate cu **`@utility`** (NU în `@layer utilities`) — obligatoriu în Tailwind v4 ca variantele (`dark:`) să se genereze.
+- Stiluri globale live în `@layer base` (body, scrollbar) și `@layer utilities` (`.tnum`). Clasele de fundal `bg-aura-dark`/`bg-aura-light` și utilitarele de glassmorphism (`glass-card`, `glass-header`, `glass-tooltip`, `glass-panel`) sunt înregistrate cu **`@utility`** (NU în `@layer utilities`) — obligatoriu în Tailwind v4 ca variantele (`dark:`) și efectele de sticlă translucide să se genereze corect.
 
 ## Fundal „aura" (linear subtil)
 

@@ -18,6 +18,7 @@ interface KpiCardData {
   unit?: string;
   icon: React.ReactNode;
   accent: string;
+  glowClass?: string;
   /** Culoare inline opțională (ex: din SERIES_COLORS) — suplimentară la `accent`. */
   accentStyle?: React.CSSProperties;
   sub: { label: string; value: string }[];
@@ -39,6 +40,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       unit: "MW",
       icon: <Zap className="h-4 w-4" />,
       accent: "text-red-500",
+      glowClass: "from-red-500/10 via-transparent to-transparent",
       sub: [
         {
           label: "Media interval",
@@ -64,6 +66,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       unit: "MW",
       icon: <Zap className="h-4 w-4" />,
       accent: "text-emerald-500",
+      glowClass: "from-emerald-500/10 via-transparent to-transparent",
       sub: [
         {
           label: "Media interval",
@@ -99,6 +102,12 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
           : latest && latest.sold < 0
             ? { color: SERIES_COLORS.soldNegative }
             : undefined,
+      glowClass:
+        latest && latest.sold > 0
+          ? "from-red-500/10 via-transparent to-transparent"
+          : latest && latest.sold < 0
+            ? "from-emerald-500/10 via-transparent to-transparent"
+            : "from-blue-500/10 via-transparent to-transparent",
       sub: [
         {
           label: "Stare",
@@ -115,6 +124,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       value: renewableShare !== undefined ? formatPercent(renewableShare) : "—",
       icon: <Leaf className="h-4 w-4" />,
       accent: "text-lime-500",
+      glowClass: "from-lime-500/10 via-transparent to-transparent",
       sub: [
         {
           label: "Media totală",
@@ -133,9 +143,17 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       {cards.map((c) => (
         <Card
           key={c.title}
-          className="relative overflow-hidden border-border/70 p-4 transition-colors hover:border-border"
+          className="glass-card relative overflow-hidden p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-border/80 hover:shadow-md"
         >
-          <div className="flex items-start justify-between">
+          {/* Ambient Glow Background */}
+          {c.glowClass && (
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-radial ${c.glowClass} opacity-60 blur-xl`}
+            />
+          )}
+
+          <div className="relative z-10 flex items-start justify-between">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {c.title}
@@ -150,7 +168,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
               </p>
             </div>
             <span
-              className={`shrink-0 rounded-md bg-card/60 p-1.5 ${c.accent}`}
+              className={`shrink-0 rounded-lg border border-border/60 bg-secondary/50 p-2 shadow-xs backdrop-blur-xs ${c.accent}`}
               style={c.accentStyle}
             >
               {c.icon}
@@ -158,7 +176,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
           </div>
 
           {c.trend && (
-            <div className="mt-2 flex items-center gap-1 text-[11px]">
+            <div className="relative z-10 mt-2 flex items-center gap-1 text-[11px]">
               {c.trend.dir === "up" ? (
                 <ArrowUpRight
                   className={`h-3 w-3 ${c.trend.positive ? "text-emerald-500" : "text-red-500"}`}
@@ -174,7 +192,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
             </div>
           )}
 
-          <div className="mt-3 flex flex-col gap-1 border-t border-border/60 pt-2">
+          <div className="relative z-10 mt-3 flex flex-col gap-1 border-t border-border/50 pt-2">
             {c.sub.map((s) => (
               <div key={s.label} className="flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">{s.label}</span>

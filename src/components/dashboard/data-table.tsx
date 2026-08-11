@@ -37,9 +37,9 @@ export function DataTable({ readings }: DataTableProps) {
   const rows = [...readings].sort((a, b) => b.ts - a.ts).slice(0, 200);
 
   return (
-    <div className="max-h-[28rem] overflow-auto rounded-md border border-border">
+    <div className="glass-panel max-h-[28rem] overflow-auto rounded-xl shadow-xs">
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm">
+        <TableHeader className="sticky top-0 z-10 bg-card/85 backdrop-blur-md">
           <TableRow className="border-border hover:bg-transparent">
             <TableHead className="h-9 text-xs">Data</TableHead>
             <TableHead className="h-9 text-right text-xs">Consum</TableHead>

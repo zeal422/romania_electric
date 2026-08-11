@@ -29,7 +29,12 @@ export function SectionCard({
   contentClassName,
 }: SectionCardProps) {
   return (
-    <Card className={cn("flex flex-col border-border/70 p-4", className)}>
+    <Card
+      className={cn(
+        "glass-card flex flex-col p-4 transition-all duration-300 hover:border-border/80 hover:shadow-md",
+        className,
+      )}
+    >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight">{title}</h3>

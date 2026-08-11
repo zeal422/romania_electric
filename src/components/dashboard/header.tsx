@@ -21,9 +21,9 @@ export function Header({ summary }: HeaderProps) {
   const relative = latestIso ? formatRelative(latestIso) : null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 glass-header">
       <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/25 shadow-xs shadow-primary/15 transition-transform hover:scale-105">
           <Zap className="h-5 w-5" />
         </div>
 
@@ -58,17 +58,20 @@ export function Header({ summary }: HeaderProps) {
             <Badge
               variant="secondary"
               role="status"
-              className="hidden gap-1.5 bg-primary/10 text-primary sm:flex"
+              className="hidden gap-1.5 border border-primary/20 bg-primary/10 text-primary backdrop-blur-xs sm:flex"
               aria-label={formatLastUpdatedLabel(relative ?? "")}
             >
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
               <span className="font-mono text-[11px] tabular-nums">{lastUpdated}</span>
             </Badge>
           )}
-          <Badge variant="outline" className="hidden gap-1 md:flex">
+          <Badge
+            variant="outline"
+            className="hidden gap-1 border-border/70 bg-card/40 backdrop-blur-xs md:flex"
+          >
             <Activity className="h-3 w-3 text-primary" />
             <span className="font-mono text-[11px] tabular-nums">
               {summary ? summary.count.toLocaleString("ro-RO") : "—"} puncte

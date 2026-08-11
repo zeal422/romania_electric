@@ -6,6 +6,31 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.13] — 2026-08-11, 05:50 EEST
+
+### Reparat
+
+- **Accesibilitate la tastatură pe elementele legendei din `SourceDistribution`** (TO_FIX F-3): rândurile din legendă erau `<div>`-uri ne-focusabile → transformate în `<button type="button">` cu `onFocus`/`onBlur` pentru declanșarea stării de highlight la navigarea cu tasta Tab.
+- **Suport focus de tastatură în `SourceLegend`** (TO_FIX F-5): butoanele aveau doar handler-e de hover (mouse) → adăugat `onFocus` și `onBlur` pentru sincronizarea vizuală `hoveredSource` la navigarea cu tasta Tab.
+- **Tabelul din `docs/05-ui-dashboard.md` avea un rând spart pe 4 coloane** (TO_FIX F-2): caracterul `|` dintre Producție și Consum în descrierea `ChartTooltip` era ne-escapat → escapat ca `\|`, restabilind structura canonică de 3 coloane.
+- **Stacking z-index inconsistent în `StorageCard`** (TO_FIX F-4): doar antetul avea `relative z-10`, iar secțiunea de valori/trend și sparkline-ul aveau poziționare implicită → adăugat `relative z-10` pe toate wrapper-ele de conținut pentru o aliniere stratificată garantată deasupra glow-ului ambiental.
+- **Manifestul de acoperire al documentației omitea 3 fișiere noi** (TO_FIX F-1): `src/hooks/use-hover-store.ts`, `src/components/dashboard/source-legend.tsx` și `src/components/dashboard/global-hover-sync.tsx` adăugate în harta `covers` a documentului `docs/05-ui-dashboard.md` din `docs/.docs-manifest.json`.
+
+## [0.3.12] — 2026-08-10, 21:20 EEST
+
+### Reparat
+
+- **Timestamp-ul numeric brut în tooltip-ul Recharts afișa un număr uriaș**: pe axa de timp X, valoarea `ts` (epoch ms) era tratată de `formatLabel` ca număr obișnuit cu separatori de mii (ex: `1,723,456,789,000`). Corectat prin adăugarea prop-ului `labelFormatter` și detectarea automată a timestamp-urilor numerice în `ChartTooltip` (`chart-tooltip.tsx`), afișând data/ora formatată curat și adaptată la granularitate.
+
+### Adăugat
+
+- **Optimizare performanță hover highlight (60 FPS fără lag React)**:
+  - Legenda surselor extrasă în componentă izolată `SourceLegend` (`src/components/dashboard/source-legend.tsx`), ordonată descrescător după valoarea curentă a producției și deconectată de `page.tsx`.
+  - Componentă invizibilă `GlobalHoverSync` (`src/components/dashboard/global-hover-sync.tsx`) ce sincronizează `hoveredSource` din Zustand cu atributul `data-hovered-source` de pe `<body>`.
+  - Selectori CSS în `src/app/globals.css` pentru evidențiere hardware-accelerated (`.area-[sursa] path` și `.pie-[sursa]`), eliminând re-randarea inutilă a graficelor mari la hover.
+- **Sumar Producție & Consum în antetul tooltip-ului**: `ChartTooltip` suportă acum `showTotals={true}`. În `ProductionMixChart`, antetul afișează Producția Totală și Consumul Total în MW alături de dată, iar linia de consum e filtrată automat din rândurile individuale pentru a evita duplicarea.
+- **Documentație**: `docs/05-ui-dashboard.md` actualizat cu detaliile componentelor `SourceLegend`, `GlobalHoverSync` și noile capabilități `ChartTooltip`.
+
 ## [0.3.11] — 2026-08-10, 11:22 EEST
 
 ### Reparat

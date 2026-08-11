@@ -13,6 +13,7 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "./chart-tooltip";
+import { useHoverStore } from "@/hooks/use-hover-store";
 import { SOURCE_ORDER, SOURCES, SERIES_COLORS } from "@/lib/sen/constants";
 import { formatAxisTick, formatNumber } from "@/lib/sen/format";
 import type { AggregatedPoint, Granularity } from "@/lib/sen/types";
@@ -29,6 +30,8 @@ const MARGIN = { top: 8, right: 12, bottom: 0, left: 0 };
  * consum trasată deasupra (punctat), pentru a vedea echilibrul cerere/ofertă.
  */
 export function ProductionMixChart({ points, granularity }: ProductionMixChartProps) {
+  const setHoveredSource = useHoverStore((state) => state.setHoveredSource);
+
   const labels = useMemo(() => {
     const m: Record<string, string> = { consum: "Consum" };
     for (const f of SOURCE_ORDER) m[f] = SOURCES[f].label;
@@ -67,7 +70,13 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
           tickMargin={4}
         />
         <Tooltip
-          content={<ChartTooltip labels={labels} />}
+          content={
+            <ChartTooltip
+              labels={labels}
+              showTotals
+              labelFormatter={(ts) => formatAxisTick(ts as number, granularity)}
+            />
+          }
           cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 3" }}
         />
         {SOURCE_ORDER.map((f, i) => (
@@ -78,13 +87,15 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
             name={f}
             stackId="sources"
             stroke={SOURCES[f].color}
-            strokeWidth={1}
             fill={`url(#grad-${f})`}
-            // Ordinea inversă pentru ca prima sursă (cărbune) să fie jos
             order={SOURCE_ORDER.length - i}
             isAnimationActive={false}
+            className={`area-${f}`}
+            onMouseEnter={() => setHoveredSource(f)}
+            onMouseLeave={() => setHoveredSource(null)}
           />
         ))}
+
         <Line
           type="monotone"
           dataKey="consum"

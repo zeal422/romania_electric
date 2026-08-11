@@ -64,8 +64,14 @@ export function StorageCard() {
           : null;
 
   return (
-    <Card className="flex flex-col border-border/70 p-4">
-      <div className="flex items-center justify-between gap-3">
+    <Card className="glass-card relative overflow-hidden flex flex-col p-4 transition-all duration-300 hover:border-border/80 hover:shadow-md">
+      {/* Ambient Purple Glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-radial from-purple-500/10 via-transparent to-transparent opacity-70 blur-xl"
+      />
+
+      <div className="relative z-10 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight">Stocare</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -98,7 +104,7 @@ export function StorageCard() {
         </span>
       </div>
 
-      <div className="mt-3 flex items-end justify-between gap-4">
+      <div className="relative z-10 mt-3 flex items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-baseline gap-1.5">
             <span className="font-mono text-3xl font-bold tabular-nums">
@@ -134,7 +140,7 @@ export function StorageCard() {
       {/* h-12 = 48px explicit (fix TO_FIX F5): fără înălțime pe wrapper, h-full-ul
           SVG-ului se rezolvă pe aspect-ratio-ul viewBox-ului → sparkline-ul se
           scala cu lățimea cardului (153px+ pe ecrane late) în loc de 48px. */}
-      <div className="mt-4 h-12">
+      <div className="relative z-10 mt-4 h-12">
         <Sparkline points={points} height={48} color={STORAGE_COLOR} />
         <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
           <span>

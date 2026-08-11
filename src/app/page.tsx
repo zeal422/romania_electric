@@ -8,17 +8,20 @@ import { DataTable } from "@/components/dashboard/data-table";
 import { DemandSupplyChart } from "@/components/dashboard/demand-supply-chart";
 import { Filters, RANGE_PRESETS } from "@/components/dashboard/filters";
 import { Footer } from "@/components/dashboard/footer";
+import { GlobalHoverSync } from "@/components/dashboard/global-hover-sync";
 import { Header } from "@/components/dashboard/header";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { ProductionMixChart } from "@/components/dashboard/production-mix-chart";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { SourceDistribution } from "@/components/dashboard/source-distribution";
+import { SourceLegend } from "@/components/dashboard/source-legend";
 import { StorageCard } from "@/components/dashboard/storage-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocalPreference } from "@/hooks/use-local-preference";
 import { useSenData, useSenSummary } from "@/hooks/use-sen-data";
-import { SOURCE_ORDER, SOURCES } from "@/lib/sen/constants";
+import { SOURCE_ORDER } from "@/lib/sen/constants";
+import { formatNumber } from "@/lib/sen/format";
 import { GRANULARITIES, granularitiesForPreset, type Granularity } from "@/lib/sen/types";
 
 const PRESET_IDS = RANGE_PRESETS.map((p) => p.id);
@@ -48,7 +51,14 @@ export default function Home() {
     isGranularity,
   );
 
+  const sortedSources = useMemo(() => {
+    if (!summary?.latest) return SOURCE_ORDER;
+    const latest = summary.latest;
+    return [...SOURCE_ORDER].sort((a, b) => (latest[b] ?? 0) - (latest[a] ?? 0));
+  }, [summary]);
+
   const endTs = summary?.endTs ?? 0;
+
   const startTs = summary?.startTs ?? 0;
 
   /** Ajustează granularitatea la o valoare compatibilă cu preset-ul (persistată). */
@@ -84,6 +94,7 @@ export default function Home() {
 
   return (
     <div className="bg-aura-light dark:bg-aura-dark flex min-h-screen flex-col bg-background">
+      <GlobalHoverSync />
       <Header summary={summary} />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 sm:px-6">
@@ -155,21 +166,7 @@ export default function Home() {
         </div>
 
         {/* Legendă comună surse */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-border/60 bg-card/40 px-3 py-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Surse:
-          </span>
-          {SOURCE_ORDER.map((f) => (
-            <span key={f} className="inline-flex items-center gap-1.5 text-xs">
-              <span
-                className="h-2.5 w-2.5 rounded-sm"
-                style={{ backgroundColor: SOURCES[f].color }}
-                aria-hidden
-              />
-              <span className="text-muted-foreground">{SOURCES[f].label}</span>
-            </span>
-          ))}
-        </div>
+        <SourceLegend sortedSources={sortedSources} />
 
         {/* Consum vs Producție + Balanță */}
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -210,7 +207,7 @@ export default function Home() {
             chartHeight={0}
             contentClassName="!h-auto"
             actions={
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className="rounded-full bg-muted/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                 max 200 rânduri
               </span>
             }
@@ -221,8 +218,8 @@ export default function Home() {
 
         {/* Indicator de încărcare discret pentru date */}
         {dataQuery.isFetching && !dataQuery.isLoading && (
-          <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 text-xs shadow-lg backdrop-blur-sm">
-            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+          <div className="glass-tooltip fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full px-3.5 py-2 text-xs shadow-xl">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
             <span className="text-muted-foreground">Actualizez…</span>
           </div>
         )}
