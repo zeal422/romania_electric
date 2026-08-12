@@ -33,6 +33,7 @@ export const LIVE_URL =
   "&p_p_lifecycle=2&p_p_state=maximized&p_p_mode=view";
 
 const LIVE_TTL_MS = 10 * 60 * 1000; // 10 minute — frecvența reală a datelor sursă
+const MAX_STALE_LIVE_TTL_MS = 24 * 60 * 60 * 1000; // max 24 ore pentru cache-ul live stale la eșec
 const FETCH_TIMEOUT_MS = 5_000; // scurt: la eșec folosim fallback-ul static, prospețimea nu e critică
 const FETCH_FAIL_TTL_MS = 60 * 1000; // backoff la eșec: nu relovim endpoint-ul timp de 1 minut
 const FETCH_OVERLAP_MS = 2 * 60 * 60 * 1000; // overlap cu ultimul punct static
@@ -61,6 +62,13 @@ let lastFailedAt = 0;
 // simultan pe cache rece (ex: route.ts face Promise.all([getLiveReadings(), getLiveSummary()]),
 // iar getLiveSummary() re-cheamă getLiveReadings()).
 let inflightFetch: Promise<SenReading[]> | null = null;
+
+function getValidStaleCacheReadings(now: number): SenReading[] {
+  if (liveCache && now - liveCache.fetchedAt < MAX_STALE_LIVE_TTL_MS) {
+    return liveCache.readings;
+  }
+  return [];
+}
 
 /** Invalidare cache live + backoff (folosit în teste). */
 export function resetLiveCache(): void {
@@ -210,7 +218,7 @@ export async function getLiveReadings(): Promise<SenReading[]> {
   const fresh = liveCache && now - liveCache.fetchedAt < LIVE_TTL_MS;
   const inBackoff = now - lastFailedAt < FETCH_FAIL_TTL_MS;
   if (fresh && liveCache) return mergeReadings(staticReadings, liveCache.readings);
-  if (inBackoff) return mergeReadings(staticReadings, []);
+  if (inBackoff) return mergeReadings(staticReadings, getValidStaleCacheReadings(now));
   // Share-uim un singur fetch pentru toți callerii concurenți (fără dublu-fetch).
   if (!inflightFetch) {
     inflightFetch = fetchLiveReadingsFromStatic(staticReadings).finally(() => {
@@ -233,11 +241,13 @@ async function fetchLiveReadingsFromStatic(staticReadings: SenReading[]): Promis
     liveCache = { readings, fetchedAt: now };
     return readings;
   } catch (err) {
-    // Fallback silențios: datele statice rămân; nu blocăm niciodată request-ul.
+    // Fallback silențios: folosește cache-ul live stale (dacă e < 24h) sau datele statice.
     // Ținem backoff ca un eșec de rețea să nu întârzie fiecare request cu timeout-ul.
     lastFailedAt = Date.now();
-    console.warn(`[live] fetch Transelectrica eșuat, folosesc datele statice: ${String(err)}`);
-    return [];
+    console.warn(
+      `[live] fetch Transelectrica eșuat, folosesc fallback (liveCache stale max 24h / statice): ${String(err)}`,
+    );
+    return getValidStaleCacheReadings(Date.now());
   }
 }
 

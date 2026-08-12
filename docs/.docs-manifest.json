@@ -4,14 +4,14 @@
   },
   "docs/01-arhitectura.md": {
     "covers": {
-      "src/app/page.tsx": "7176568b2381a7ea0129133d140f1bf6233a69ec4a00dbcc915e3832a0ea96f4",
+      "src/app/page.tsx": "7a4a52914b5316abe06061ad6c698cea6e23c6b0d9a52cc2638383a6cca86b96",
       "src/app/layout.tsx": "e9847fb7f663ae3cf8ee66bd856dddefa0db7cf2d197739887d3c26dfcafbc97",
       "src/components/providers.tsx": "7330d5361692de2a634eb771414e57324c21bf5de786e94b99b24ae9daa7e724",
       "src/lib/sen/index.ts": "a03967937faa152f560833300469defbba70b957ca5e4a80e7d27f3f2f3f4e12",
       "src/lib/utils.ts": "d1f1e0d62cb8d8d1e04c26e14de842d8a151f75812d81b046c65b5d1fe8e4b27",
       "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
       "package.json": "1b7a86eeca0b592f220ad32c26c7efb6cf6d114e358dd06a2f34fc89e1268378",
-      "src/lib/sen/live.ts": "52b5ebe28658795c31553c0111667dd027537db265c9eb834c4e301897ea2d59",
+      "src/lib/sen/live.ts": "a1c0aa5f4f2027fd3bfd004a8f486f9ba13807fda165c7f19e4a8a4f108b411d",
       "src/lib/sen/storage.ts": "fe9f49c0236b8a91909fb94ff460d0387bebb5308e1039997c4c799df89b11d6",
       "src/components/dashboard/storage-card.tsx": "f5d493851ff90bcaa6edaf7a28977dfa1c78bcf70b9a00b6453655445ca3955c"
     }
@@ -33,7 +33,7 @@
       "src/hooks/use-sen-data.ts": "d7253dbe5677c7c3ec329667e4d5eaf67a93c715c57f1ec5d4184dacc2f70667",
       "src/components/dashboard/filters.tsx": "00fe60b92f3aa5c7f210a4e804f049814f4bdf8f1867acbca1d989ea14ba126d",
       "src/lib/sen/types.ts": "5e00f4332a1835b25089979accf30a89194ab6c86dcebc61d4524dc9b4db6fcd",
-      "src/lib/sen/live.ts": "52b5ebe28658795c31553c0111667dd027537db265c9eb834c4e301897ea2d59",
+      "src/lib/sen/live.ts": "a1c0aa5f4f2027fd3bfd004a8f486f9ba13807fda165c7f19e4a8a4f108b411d",
       "src/app/api/sen/storage/route.ts": "8b81bdb836e43f7b90627b37bd3a3ea9066447e915e62cc4d83ac2b1e73b691e",
       "src/hooks/use-storage-data.ts": "e9aabf91cd627e9a625cadb449326fff043da1ffff1c4d6781c3eb84b844804a",
       "src/lib/sen/storage.ts": "fe9f49c0236b8a91909fb94ff460d0387bebb5308e1039997c4c799df89b11d6"
@@ -48,14 +48,14 @@
       "src/lib/sen/format.ts": "7b1833557ff3dff1d5d470e3e30e66a7bee98000505c99884577fd941df19862",
       "src/lib/sen/loader.ts": "3dc03f27130170651d0a18b1c625ef113e8100a900e419626f1804dee644f40a",
       "src/lib/sen/index.ts": "a03967937faa152f560833300469defbba70b957ca5e4a80e7d27f3f2f3f4e12",
-      "src/lib/sen/live.ts": "52b5ebe28658795c31553c0111667dd027537db265c9eb834c4e301897ea2d59",
+      "src/lib/sen/live.ts": "a1c0aa5f4f2027fd3bfd004a8f486f9ba13807fda165c7f19e4a8a4f108b411d",
       "src/lib/sen/storage.ts": "fe9f49c0236b8a91909fb94ff460d0387bebb5308e1039997c4c799df89b11d6",
       "src/components/dashboard/storage-card.tsx": "f5d493851ff90bcaa6edaf7a28977dfa1c78bcf70b9a00b6453655445ca3955c"
     }
   },
   "docs/05-ui-dashboard.md": {
     "covers": {
-      "src/app/page.tsx": "7176568b2381a7ea0129133d140f1bf6233a69ec4a00dbcc915e3832a0ea96f4",
+      "src/app/page.tsx": "7a4a52914b5316abe06061ad6c698cea6e23c6b0d9a52cc2638383a6cca86b96",
       "src/components/dashboard/header.tsx": "c2f5719af2c2253bf22d9cc81c3fcb4147a84124aaa267b6e9d167e5db405fc5",
       "src/components/dashboard/filters.tsx": "00fe60b92f3aa5c7f210a4e804f049814f4bdf8f1867acbca1d989ea14ba126d",
       "src/components/dashboard/kpi-cards.tsx": "d288b1d4779e75b3ca7e175c2db9b3d591fc8975b5fb28532eaf76729e9be205",
@@ -95,7 +95,7 @@
       "tests/sen/aggregate.test.ts": "863aab686628c03c4c44a1a29d84fdaa39fc77a02995e89f2a9d4b04207138ee",
       "tests/sen/stats.test.ts": "eb65d371a261cb14dd3b5e77df77c54a9928f2c8571315644a31ad43439a768e",
       "tests/sen/format.test.ts": "c5cc8e6523b3aa19a73717b2baab3b1bf37405a44adcba1c8d0a1ac2f40976d4",
-      "tests/sen/live.test.ts": "4692ea3ad08f7f179e4217aea5ff65f0964b4b8486f3425c4bb18dcb0734d731",
+      "tests/sen/live.test.ts": "0a3375e3568f9772c50aeec66b88221ab08086fbe3f0bde4d4278e1271702d5b",
       "tests/local-preference.test.ts": "3786986f262c9c293cf6a0fdcae4271e768811eb947b2886111bca8a05237689",
       "tests/storage.test.ts": "78f9b3f535d174707ffb96bff48781e73c4027fe6de84fcc07fd64fb91599c30",
       "tests/capture-storage.test.ts": "d9b5ae6c27371a5b5d5e1b8c129666af7ab739d5d21fe54860fd7a856d62ed27"
@@ -103,7 +103,7 @@
   },
   "docs/08-harta-cautare.md": {
     "covers": {
-      "src/app/page.tsx": "7176568b2381a7ea0129133d140f1bf6233a69ec4a00dbcc915e3832a0ea96f4",
+      "src/app/page.tsx": "7a4a52914b5316abe06061ad6c698cea6e23c6b0d9a52cc2638383a6cca86b96",
       "src/app/layout.tsx": "e9847fb7f663ae3cf8ee66bd856dddefa0db7cf2d197739887d3c26dfcafbc97",
       "src/components/providers.tsx": "7330d5361692de2a634eb771414e57324c21bf5de786e94b99b24ae9daa7e724",
       "src/components/dashboard/header.tsx": "c2f5719af2c2253bf22d9cc81c3fcb4147a84124aaa267b6e9d167e5db405fc5",
@@ -142,8 +142,8 @@
       "tests/sen/format.test.ts": "c5cc8e6523b3aa19a73717b2baab3b1bf37405a44adcba1c8d0a1ac2f40976d4",
       "package.json": "1b7a86eeca0b592f220ad32c26c7efb6cf6d114e358dd06a2f34fc89e1268378",
       "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
-      "src/lib/sen/live.ts": "52b5ebe28658795c31553c0111667dd027537db265c9eb834c4e301897ea2d59",
-      "tests/sen/live.test.ts": "4692ea3ad08f7f179e4217aea5ff65f0964b4b8486f3425c4bb18dcb0734d731",
+      "src/lib/sen/live.ts": "a1c0aa5f4f2027fd3bfd004a8f486f9ba13807fda165c7f19e4a8a4f108b411d",
+      "tests/sen/live.test.ts": "0a3375e3568f9772c50aeec66b88221ab08086fbe3f0bde4d4278e1271702d5b",
       "tests/local-preference.test.ts": "3786986f262c9c293cf6a0fdcae4271e768811eb947b2886111bca8a05237689",
       "src/lib/sen/storage.ts": "fe9f49c0236b8a91909fb94ff460d0387bebb5308e1039997c4c799df89b11d6",
       "src/app/api/sen/storage/route.ts": "8b81bdb836e43f7b90627b37bd3a3ea9066447e915e62cc4d83ac2b1e73b691e",

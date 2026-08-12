@@ -25,7 +25,7 @@ Toate rutele sunt în `src/app/api/sen/`. Sunt `force-dynamic` (fără cache la 
 
 **Comportament:**
 
-- **Datele includ și live-ul Transelectrica**: fiecare request merge datele statice cu ultimele date live (fetch cu cache TTL 10 min în `src/lib/sen/live.ts`). Dacă Transelectrica e indisponibilă, se folosesc doar datele statice (fallback silențios) — API-ul rămâne funcțional.
+- **Datele includ și live-ul Transelectrica**: fiecare request merge datele statice cu ultimele date live (fetch cu cache TTL 10 min în `src/lib/sen/live.ts`). Dacă Transelectrica e indisponibilă, se folosește mai întâi `liveCache`-ul stale existent în memorie (până la 24h), iar datele statice sunt ultimul resort — API-ul rămâne funcțional.
 - Filtrează după `[from, to]`, agreghează în bucket-uri, calculează media fiecărui câmp.
 - La `granularity=raw` pe intervale mari se aplică **downsampling uniform la 1.200 puncte** (`MAX_POINTS`) — protecție intenționată, nu o corecta.
 - Răspunsul include și statistici pe interval: `count`, `consum`/`productie`/`sold` (min/max/avg) și `renewableShareAvg`.

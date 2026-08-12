@@ -144,7 +144,7 @@ Structura corespunde tipului [`SenSummaryResponse`](../src/lib/sen/types.ts).
 - `mergeReadings(static, live)` — dedupe pe `ts` (live câștigă), sortat crescător (pură).
 - `bucharestOffsetMs(date)` — offset-ul EET/EEST (+2h/+3h) după regulile UE, pentru capătul „end" al interogării (pură).
 - `fetchLiveReadings(fromTs, toTs)` — fetch cu `AbortSignal.timeout(5s)`; `buildLiveUrl` construiește query-ul. **Guard anti-shift**: `hasSuspiciousNightSolar` respinge payload-urile cu `foto > 50 MW` între 00-06h (solarul nu produce noaptea — fereastra acoperă noaptea fizică de vară: primul `foto > 50` real e la 06:13), ca un payload corupt să nu suprascrie rândurile statice bune prin dedupe.
-- `getLiveReadings()` — date statice + live cu **cache TTL 10 min**; **fallback silențios la statice** dacă fetch-ul eșuează, cu **backoff 1 min** (un eșec de rețea nu întârzie fiecare request cu timeout-ul — dashboard-ul nu se rupe niciodată). Folosește o **promisiune în zbor partajată** (`inflightFetch`) ca mai multe requesturi concurente să nu dubleze fetch-ul.
+- `getLiveReadings()` — date statice + live cu **cache TTL 10 min**; la eșec Transelectrica sau în backoff, folosește **fallback pe `liveCache` stale** (până la o limită de 24h) înainte de a reveni la datele statice pure, prevenind căderea bruscă a dashboard-ului la ultima dată din fișier. Include **backoff 1 min** la eșec și o **promisiune în zbor partajată** (`inflightFetch`) pentru requesturi concurente.
 - `getLiveSummary()` — summary-ul precalculat cu `latest`/`end`/`endTs`/`count` actualizate dacă live-ul a adus puncte mai noi.
 - **Server-only** (folosește `fetch` server-side) — nu importa în componente client.
 

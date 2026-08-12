@@ -2,7 +2,7 @@
 
 Dashboard interactiv pentru consumul și producția de energie din **Sistemul Energetic Național** al României, construit pe baza datelor publicate de **Transelectrica**.
 
-Datele acoperă intervalul **1 iulie 2026 → în prezent**, cu **5.606 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export). Setul crește **automat zilnic** (fetch incremental de pe site-ul live Transelectrica), iar dashboard-ul afișează și **datele live** (cache 10 min, cu fallback la datele statice dacă Transelectrica e indisponibilă).
+Datele acoperă intervalul **1 iulie 2026 → în prezent**, cu **5.606 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export). Setul crește **automat zilnic** (fetch incremental de pe site-ul live Transelectrica), iar dashboard-ul afișează și **datele live** (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
 
 ![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-131%20unit%C4%83%C8%9Bi-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 
@@ -95,7 +95,7 @@ snapshot /sen-filter → data/sen-storage.json (capturi orare, workflow storage-
 ```
 
 - **Convertor**: `scripts/convert-sen.py` (Python) — modul implicit citește foaia „Grafic SEN" din xlsx (openpyxl); modul `--fetch` descarcă **incremental** de pe endpoint-ul public Transelectrica (stdlib-only, fără openpyxl). Ambele normalizează timpul și valorile (elimină markerii `*`), sortează crescător și calculează summary-ul global.
-- **Date live la runtime**: `src/lib/sen/live.ts` face fetch la Transelectrica cu **cache TTL 10 min** și **fallback la datele statice** dacă fetch-ul eșuează — dashboard-ul rămâne funcțional oricând, dar afișează și cele mai recente date.
+- **Date live la runtime**: `src/lib/sen/live.ts` face fetch la Transelectrica cu **cache TTL 10 min** și **fallback la datele stale din cache (max 24h) sau la cele statice** dacă fetch-ul eșuează — dashboard-ul rămâne funcțional oricând, dar afișează și cele mai recente date.
 - **Automatizare**: workflow-ul `.github/workflows/data-refresh.yml` rulează zilnic `bun run data:refresh` și face commit — istoricul crește singur, iar Vercel redeploy-ează automat (Git integration).
 - **Stocare (ISPOZ)**: Transelectrica expune stocarea doar ca snapshot (`/sen-filter`), fără istoric. Workflow-ul `.github/workflows/storage-capture.yml` (cron orar) rulează `python3 scripts/convert-sen.py --capture-storage` și acumulează puncte în `data/sen-storage.json`; la runtime `src/lib/sen/storage.ts` întreabă snapshot-ul live (TTL 10 min), cu fallback în ordine: **răspunsul live → snapshot-ul live stale din cache → ultima captură** (Transelectrica indisponibilă nu rupe site-ul).
 

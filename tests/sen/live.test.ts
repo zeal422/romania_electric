@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 
 import {
   bucharestOffsetMs,
@@ -220,6 +220,36 @@ describe("getLiveReadings / getLiveSummary (fetch mock-uit)", () => {
     // latest rămâne cel static (nu există citire mai nouă).
     expect(summary.latest.t).not.toBe("2026-08-08T10:00:00.000Z");
     expect(summary.endTs).toBeGreaterThan(0);
+  });
+
+  it("uses stale liveCache as fallback when subsequent live fetch fails", async () => {
+    // 1. Primul fetch reușește și aduce citiri mai noi decât static-ul de pe disc
+    const freshPayload = await payloadNewerThanStatic();
+    const { endTs } = await loadSummary();
+    const expectedLatestIso = new Date(endTs + 20 * 60_000).toISOString();
+
+    let mockTime = endTs + 20 * 60_000;
+    spyOn(Date, "now").mockImplementation(() => mockTime);
+
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(
+      (async () => new Response(freshPayload, { status: 200 })) as unknown as typeof fetch,
+    );
+
+    const summary1 = await getLiveSummary();
+    expect(summary1.latest.t).toBe(expectedLatestIso);
+
+    // 2. Avansăm timpul cu 11 minute (> TTL 10 min), forțând fresh = false
+    mockTime += 11 * 60 * 1000;
+
+    // Al doilea fetch eșuează (Transelectrica indisponibilă/timeout)
+    fetchSpy.mockImplementation((async () => {
+      throw new Error("Transelectrica timeout / network down");
+    }) as unknown as typeof fetch);
+
+    const summary2 = await getLiveSummary();
+    // Execută ramura de fallback la eșec (fresh e false, fetch aruncă eroare,
+    // iar getValidStaleCacheReadings() returnează liveCache stale).
+    expect(summary2.latest.t).toBe(expectedLatestIso);
   });
 });
 

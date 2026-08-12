@@ -186,7 +186,7 @@ export default function Home() {
 
           <SectionCard
             title="Balanța energetică (Sold)"
-            subtitle="Pozitiv = export · Negativ = import"
+            subtitle="Pozitiv = import · Negativ = export"
             chartHeight={300}
           >
             {dataQuery.isLoading ? (

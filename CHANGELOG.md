@@ -6,6 +6,27 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.16] — 2026-08-12, 11:55 EEST
+
+### Reparat
+
+- **Test fragil la creșterea datelor statice în `tests/sen/live.test.ts`**: înlocuit payload-ul cu dată fixă (`10-08-2026 12:00:00`) cu generare dinamică prin `payloadNewerThanStatic()`, asigurând că suita de teste rămâne 100% rezistentă la actualizarea zilnică automată a fișierului `sen-data.json`.
+- **Inconsistență documentație în `README.md`**: aliniat textul de la liniile 5 și 98 din `README.md` cu cel din `docs/01-04` prin specificarea ordinii reale de fallback pe `liveCache` stale (max 24h) înainte de coborârea la date statice.
+- **Log precizat în `src/lib/sen/live.ts`**: ajustat mesajul din `console.warn` (linia 248) la eșecul de fetch Transelectrica pentru o mai bună claritate la debugging.
+
+## [0.3.15] — 2026-08-12, 08:19 EEST
+
+### Reparat
+
+- **Subtitle inversat pe cardul Balanța energetică (Sold)** (TO_FIX F-1): textul din `src/app/page.tsx:189` spunea „Pozitiv = export · Negativ = import”, fiind invers față de formula Transelectrica (`SOLD = CONS - PROD`), `AGENTS.md` și restul codului $\rightarrow$ corectat în „Pozitiv = import · Negativ = export”.
+
+## [0.3.14] — 2026-08-11, 16:48 EEST
+
+### Reparat
+
+- **Eșecul temporar de fetch la Transelectrica reseta dashboard-ul la datele din 9 August**: când endpoint-ul live dădea timeout sau era suprasolicitat, `getLiveReadings()` din `src/lib/sen/live.ts` ignora `liveCache`-ul existent în memorie și făcea fallback direct la datele statice `sen-data.json`. Rezolvat prin utilizarea `liveCache`-ului stale existent în memorie (până la o limită de siguranță de 24h, `MAX_STALE_LIVE_TTL_MS`) atunci când un fetch eșuează sau când suntem în perioada de backoff de 1 minut.
+- **Documentație și Testare**: actualizate `docs/01-arhitectura.md`, `docs/02-pipeline-date.md`, `docs/03-api.md` și `docs/04-strat-date.md` pentru a descrie ordinea reală de fallback pe `liveCache` stale (max 24h); remediat testul unitar `uses stale liveCache as fallback` din `tests/sen/live.test.ts` (simulare avansare timp > 10 min pentru executarea reală a ramurii de fallback pe cache-ul stale).
+
 ## [0.3.13] — 2026-08-11, 05:50 EEST
 
 ### Reparat

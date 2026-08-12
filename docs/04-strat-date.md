@@ -14,7 +14,7 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 | [`stats.ts`](../src/lib/sen/stats.ts)         | `fieldStats`, `renewableShare`, `sourceShares`, `balanceStats`, `latestReading`                                                                                                          |
 | [`format.ts`](../src/lib/sen/format.ts)       | Formatare `Intl` ro-RO: numere, MW, sold, procente, date, ore                                                                                                                            |
 | [`loader.ts`](../src/lib/sen/loader.ts)       | Citire `data/*.json` — **server-only**, cache singleton (excepția de la „pur")                                                                                                           |
-| [`live.ts`](../src/lib/sen/live.ts)           | Date live Transelectrica — **server-only**: parse/merge pure + fetch cu TTL 10 min + fallback static                                                                                     |
+| [`live.ts`](../src/lib/sen/live.ts)           | Date live Transelectrica — **server-only**: parse/merge pure + fetch cu TTL 10 min + fallback la `liveCache` stale (max 24h) și date statice                                             |
 | [`storage.ts`](../src/lib/sen/storage.ts)     | Stocare (ISPOZ) — **server-only**: serie acumulată (cache singleton) + snapshot live `/sen-filter` cu TTL 10 min + fallback la ultima captură                                            |
 
 ## `types.ts` — tipurile cheie
