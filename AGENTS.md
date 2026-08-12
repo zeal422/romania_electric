@@ -126,6 +126,10 @@ Grep-ul e un **indicator**, nu un adevăr. După un grep, **deschide codul la lo
 
 Un test eșuat, o documentație învechită sau un gap de securitate sunt probleme indiferent dacă au fost introduse azi sau acum șase luni. **Nu respinge problemele pre-existente** ca „nu e al meu". (Principiul există deja în §7.2 — aici îl facem explicit și transversal.)
 
+### 4.14. Un test care nu poate eșua nu e dovadă
+
+Când scrii un test de regresie, confirmă mai întâi că _eșuează_ pe codul nemodificat și _trece_ pe cel corect — altfel e tautologic și nu demonstrează nimic (testele arată prezența bug-urilor, nu absența lor). Totodată, înainte de orice fix, enunță **invariantul** care trebuie să țină și _de ce_ modificarea îl restabilește: codul corect se demonstrează prin construcție, nu se obține „la noroc" până devine verde. Nici un test care trece, nici un `bun run check` verde nu înlocuiesc raționamentul de ce e corect. (Rămâne valabilă indiferent de starea fișierului `TO_FIX.md` — regulă de bază, nu un pas de workflow.)
+
 ## 5. Lucruri de evitat (mistakes comune)
 
 - ❌ Folosirea `npm install` / `pnpm` — proiectul e pe **Bun** (`bun.lock`).
@@ -157,7 +161,7 @@ Un test eșuat, o documentație învechită sau un gap de securitate sunt proble
 Tipuri valide: `feat` (funcționalitate nouă), `fix` (corectură), `docs` (documentație), `refactor`, `chore` (curățenie/întreținere), `test`, `perf`. Titlul = o frază scurtă (max ~72 caractere). Corpul cu `-` listează fiecare schimbare notabilă (modul nou, fix, workflow, documentație, teste, curățenie) — nu rezuma, enumeră. Mesajul se oferă **doar la cerere**; agentul nu face commit-uri niciodată.
 
 8. **Gândește înainte de a scrie**: enunță-ți presupunerile explicit. Dacă există interpretări multiple, prezintă-le — nu alege singur în tăcere. Dacă există o abordare mai simplă, propune-o. Dacă ceva e neclar, oprește-te și întreabă.
-9. **Simplitate întâi**: scrie minimul de cod care rezolvă problema utilizatorului. Nu adăuga funcționalități speculative, configurabilitate inutilă sau abstracții pentru cod cu un singur consumator. (Consistent cu §5 — „nu adăuga o dependență fără să fie necesară".)
+9. **Simplitate întâi**: scrie minimul de cod care rezolvă problema utilizatorului. Nu adăuga funcționalități speculative, configurabilitate inutilă sau abstracții pentru cod cu un singur consumator. _Simplitatea e premisa fiabilității_ — codul complicat e exact cel pe care niciun test nu-l poate demonstra corect (vezi §4.14). (Consistent cu §5 — „nu adăuga o dependență fără să fie necesară".)
 10. **Schimbări chirurgicale**: atinge doar ce trebuie. Nu „îmbunătăți" codul adiacent, comentariile sau formatarea decât dacă ți s-a cerut explicit. Fiecare linie schimbată se leagă direct de cererea utilizatorului. Curăță-ți propriile artefacte orfane, dar lasă codul mort pre-existent în pace — anunță utilizatorul.
 11. **Execuție orientată spre obiective verificabile**: transformă sarcinile în obiective demonstrabile (ex: „scrie un test care reproduce bug-ul, apoi fă-l să treacă") și iterează independent până când obiectivul e verificat.
 
