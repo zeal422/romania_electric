@@ -133,6 +133,16 @@ export const STORAGE_COLOR = "#A582FF";
  */
 export const STORAGE_TREND_THRESHOLD_MW = 0.5;
 
+/**
+ * Pragul de prospețime pentru badge-ul din Header (ms): dacă vârsta reală a ultimei
+ * înregistrări (`dataAgeMs`) depășește pragul, datele sunt considerate VECHI (fetch-ul
+ * live a eșuat → fallback pe seria arhivată) și UI-ul afișează un avertisment vizibil.
+ * 30 min = 3× frecvența reală a datelor sursă (~10 min): un gap mai mare înseamnă
+ * aproape sigur fallback, nu o simplă pauză de actualizare. Centralizat ca toate
+ * constantele UI (AGENTS §4.5) — nu hardcoda în componente.
+ */
+export const LIVE_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+
 export const READING_FIELDS = [
   "consum",
   "medieConsum",

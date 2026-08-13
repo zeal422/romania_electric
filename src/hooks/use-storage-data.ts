@@ -13,8 +13,9 @@ export function useStorageData() {
       if (!res.ok) throw new Error("Nu am putut încărca datele de stocare");
       return res.json();
     },
-    // Istoricul se construiește orar prin workflow; la runtime nu are sens
-    // să lovim endpoint-ul mai des decât cât durează o sesiune de vizitare.
-    staleTime: 5 * 60 * 1000,
+    // Polling la 60s: valoarea curentă se actualizează la fiecare TTL server
+    // (~3 min, vezi storage.ts) — cardul nu mai stă ore întregi pe aceeași valoare.
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 }

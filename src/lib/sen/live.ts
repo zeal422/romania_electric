@@ -35,7 +35,13 @@ export const LIVE_URL =
 
 const LIVE_TTL_MS = 10 * 60 * 1000; // 10 minute — frecvența reală a datelor sursă
 const MAX_STALE_LIVE_TTL_MS = 24 * 60 * 60 * 1000; // max 24 ore pentru cache-ul live stale la eșec
-const FETCH_TIMEOUT_MS = 5_000; // scurt: la eșec folosim fallback-ul static, prospețimea nu e critică
+// Timeout 15s (măsurat: răspuns real ~3.9s — 5s era prea aproape, orice vârf de trafic dădea
+// timeout fals → fallback pe date statice). Un eșec REAL intră oricum pe fallback (prospețimea
+// nu e critică), dar un răspuns lent dar valid nu mai e pierdut.
+const FETCH_TIMEOUT_MS = 15_000;
+// Reîncercăm o dată pe eșec tranzitoriu (timeout/rețea/HTTP non-OK), cu pauză scurtă.
+const FETCH_RETRIES = 1;
+const FETCH_RETRY_DELAY_MS = 1_000;
 const FETCH_FAIL_TTL_MS = 60 * 1000; // backoff la eșec: nu relovim endpoint-ul timp de 1 minut
 const FETCH_OVERLAP_MS = 2 * 60 * 60 * 1000; // overlap cu ultimul punct static
 const MAX_BACKFILL_MS = 3 * 24 * 60 * 60 * 1000; // nu întreba mai mult de 3 zile înapoi
@@ -173,22 +179,59 @@ export function hasSuspiciousNightSolar(readings: SenReading[]): boolean {
   return false;
 }
 
-/** Fetch live pentru intervalul [fromTs, toTs] (epoch ms). Arunca la eroare. */
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Fetch live pentru intervalul [fromTs, toTs] (epoch ms). Arunca la eroare.
+ * Reîncearcă o dată (FETCH_RETRIES) pe eșec TRANZITORIU (rețea/timeout/HTTP non-OK),
+ * cu pauză scurtă — Transelectrica e uneori lent dar valid (răspuns măsurat ~3.9s),
+ * iar un singur timeout fals ar trece pe fallback fără motiv. Validările de payload
+ * (gol / shift de coloane — guard anti-shift) NU se reîncearcă: sunt deterministe.
+ */
 export async function fetchLiveReadings(fromTs: number, toTs: number): Promise<SenReading[]> {
   const url = buildLiveUrl(fromTs, toTs);
-  const res = await fetch(url, {
-    headers: { "User-Agent": UA, Accept: "text/plain,*/*" },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Transelectrica live HTTP ${res.status}`);
-  const text = await res.text();
-  const readings = parseLivePayload(text);
-  if (readings.length === 0) throw new Error("Transelectrica live: payload gol");
-  if (hasSuspiciousNightSolar(readings)) {
-    throw new Error("Transelectrica live: foto noaptea (posibil shift de coloane) — ignor payload");
+  let lastTransientErr: unknown = null;
+  for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
+    if (attempt > 0) await sleep(FETCH_RETRY_DELAY_MS);
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": UA, Accept: "text/plain,*/*" },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        cache: "no-store",
+      });
+      // 5xx = server tranzitoriu → retry; 4xx (ex: 403/404) e determinist, n-ar ajuta.
+      if (res.status >= 500) {
+        lastTransientErr = new Error(`Transelectrica live HTTP ${res.status}`);
+        continue;
+      }
+      if (!res.ok) {
+        // Non-5xx (4xx etc.) = determinist — marcat non-retryable, re-aruncat în catch.
+        const err = new Error(`Transelectrica live HTTP ${res.status}`) as Error & {
+          retryable: false;
+        };
+        err.retryable = false;
+        throw err;
+      }
+      // Body-read inclus în protecția de retry: un eșec mid-stream e tot tranzitoriu.
+      const text = await res.text();
+      const readings = parseLivePayload(text);
+      if (readings.length === 0) throw new Error("Transelectrica live: payload gol");
+      if (hasSuspiciousNightSolar(readings)) {
+        throw new Error(
+          "Transelectrica live: foto noaptea (posibil shift de coloane) — ignor payload",
+        );
+      }
+      return readings;
+    } catch (err) {
+      // Validările deterministe (payload gol / shift de coloane) și erorile HTTP
+      // non-5xx (marcate `retryable: false`) se re-aruncă imediat, fără retry.
+      // Doar eșecurile tranzitorii (rețea/timeout/body-stream/5xx) primesc a doua încercare.
+      if (err instanceof Error && /(payload gol|foto noaptea)/.test(err.message)) throw err;
+      if (err instanceof Error && (err as { retryable?: boolean }).retryable === false) throw err;
+      lastTransientErr = err;
+    }
   }
-  return readings;
+  throw lastTransientErr instanceof Error ? lastTransientErr : new Error(String(lastTransientErr));
 }
 
 /**

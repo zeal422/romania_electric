@@ -6,12 +6,13 @@ Toate rutele sunt în `src/app/api/sen/`. Sunt `force-dynamic` (fără cache la 
 
 ## Endpoint-uri
 
-| Endpoint               | Rol                                                |
-| ---------------------- | -------------------------------------------------- |
-| `GET /api/sen`         | Date agregate într-un interval                     |
-| `GET /api/sen/summary` | KPI global precalculat                             |
-| `GET /api/sen/storage` | Stocare (ISPOZ): valoare curentă + serie acumulată |
-| `GET /api/sen/export`  | Export CSV                                         |
+| Endpoint               | Rol                                                            |
+| ---------------------- | -------------------------------------------------------------- |
+| `GET /api/sen`         | Date agregate într-un interval                                 |
+| `GET /api/sen/summary` | KPI global precalculat                                         |
+| `GET /api/sen/instant` | Valori real-time (Consum/Producție/Sold + mix), `null` la eșec |
+| `GET /api/sen/storage` | Stocare (ISPOZ): valoare curentă + serie acumulată             |
+| `GET /api/sen/export`  | Export CSV                                                     |
 
 ### `GET /api/sen` — date agregate într-un interval
 
@@ -25,7 +26,7 @@ Toate rutele sunt în `src/app/api/sen/`. Sunt `force-dynamic` (fără cache la 
 
 **Comportament:**
 
-- **Datele includ și live-ul Transelectrica**: fiecare request merge datele statice cu ultimele date live (fetch cu cache TTL 10 min în `src/lib/sen/live.ts`). Dacă Transelectrica e indisponibilă, se folosește mai întâi `liveCache`-ul stale existent în memorie (până la 24h), iar datele statice sunt ultimul resort — API-ul rămâne funcțional.
+- **Datele includ și live-ul Transelectrica**: fiecare request merge datele statice cu ultimele date live (fetch cu cache TTL 10 min în `src/lib/sen/live.ts`; timeout 15s + 1 retry pe eșec tranzitoriu (rețea/5xx) — fix 0.3.22). Dacă Transelectrica e indisponibilă, se folosește mai întâi `liveCache`-ul stale existent în memorie (până la 24h), iar datele statice sunt ultimul resort — API-ul rămâne funcțional.
 - Filtrează după `[from, to]`, agreghează în bucket-uri, calculează media fiecărui câmp.
 - La `granularity=raw` pe intervale mari se aplică **downsampling uniform la 1.200 puncte** (`MAX_POINTS`) — protecție intenționată, nu o corecta.
 - Răspunsul include și statistici pe interval: `count`, `consum`/`productie`/`sold` (min/max/avg) și `renewableShareAvg`.
@@ -67,6 +68,34 @@ Folosit de pagina principală pentru KPI-uri și header, fără să încarce toa
 
 ---
 
+### `GET /api/sen/instant` — valori real-time
+
+Fără parametri. Întoarce snapshot-ul INSTANT de la `/sen-filter` — aceleași valori pe care site-ul oficial le afișează în bara „Consum / Producție / Sold" (poll-uite de ei la 10s), granularitate de secunde (tip `InstantData`, vezi [`types.ts`](../src/lib/sen/types.ts)):
+
+```json
+{
+  "t": "2026-08-13T15:12:27.000Z",
+  "ts": 1786626747000,
+  "consum": 4506,
+  "productie": 5007,
+  "sold": -501,
+  "carbune": 584,
+  "hidrocarburi": 1001,
+  "ape": 260,
+  "nuclear": 0,
+  "eolian": 396,
+  "foto": 2703,
+  "biomasa": 54
+}
+```
+
+- **Fallback lin**: la eșec/stale (Transelectrica indisponibilă, snapshot mai vechi de 30 min) răspunde **`null`** — UI-ul cade pe `summary.latest` (KPI/Mix/Header), site-ul nu se rupe. Fetch intern: timeout 8s + 1 retry pe eșec tranzitoriu + backoff 30s (modulul [`src/lib/sen/instant.ts`](../src/lib/sen/instant.ts)).
+- **Polling client**: [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts) (`useInstantData`, query key `["sen","instant"]`) — `refetchInterval 30s`, `staleTime 15s`.
+
+**Cache:** `public, s-maxage=10, stale-while-revalidate=30`.
+
+---
+
 ### `GET /api/sen/storage` — stocare (ISPOZ)
 
 Fără parametri. Întoarce valoarea curentă de stocare + seria acumulată de capturi orare (tip `StorageApiResponse`, vezi [`types.ts`](../src/lib/sen/types.ts)):
@@ -84,13 +113,13 @@ Fără parametri. Întoarce valoarea curentă de stocare + seria acumulată de c
 
 > Contract de timp (fix TO_FIX #6): `t` e wall-clock România etichetat UTC, iar `ts` e **epoch-ul UTC al valorii `t` etichetate** (la fel ca la datele SEN) — nu instant-ul local real.
 
-- `current` — snapshot-ul cel mai recent: fetch live la `/sen-filter` (TTL 10 min) sau, la eșec, **cea mai recentă valoare cunoscută**. `current.source` e proveniența valorii:
+- `current` — snapshot-ul cel mai recent: fetch live la `/sen-filter` (TTL 3 min din 0.3.23 — polling client 60s, deci valoarea se actualizează la câteva minute) sau, la eșec, **cea mai recentă valoare cunoscută**. `current.source` e proveniența valorii:
   - `"live"` — snapshot de la `/sen-filter`, fie proaspăt (în TTL), fie **stale** (din cache, după expirarea TTL-ului — rămâne „live", nu „captură");
   - `"capture"` — ultimul punct din istoricul acumulat (fallback pur, când nu există niciun snapshot live).
     `null` doar dacă nu există încă nicio valoare cunoscută.
 - `fetchedAt` — momentul real în care a fost obținut `current`: > 0 pentru valorile live (chiar stale — timestamp-ul original), `0` pentru punctul din istoric (`source: "capture"`).
 - `history` — seria completă din `data/sen-storage.json`, ordonată cronologic (începe de la prima captură a workflow-ului `storage-capture`).
-- Folosit de `StorageCard` prin [`src/hooks/use-storage-data.ts`](../src/hooks/use-storage-data.ts) (query key `["sen","storage"]`, `staleTime 5 min`).
+- Folosit de `StorageCard` prin [`src/hooks/use-storage-data.ts`](../src/hooks/use-storage-data.ts) (query key `["sen","storage"]`, `refetchInterval 60s`).
 
 **Cache:** `public, s-maxage=120, stale-while-revalidate=600`.
 
@@ -113,8 +142,9 @@ Fără parametri. Întoarce valoarea curentă de stocare + seria acumulată de c
 
 ## Cum apelează clientul API-ul
 
-- [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts): `useSenSummary()` (query key `["sen","summary"]`) și `useSenData(from, to, granularity)` (query key `["sen","data",from,to,granularity]`).
-- React Query: `staleTime 60s`, fără `refetchOnWindowFocus`, `retry: 1` (configurat în [`src/components/providers.tsx`](../src/components/providers.tsx)).
+- [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts): `useSenSummary()` (query key `["sen","summary"]`, `refetchInterval 60s`) și `useSenData(from, to, granularity)` (query key `["sen","data",from,to,granularity]`, `refetchInterval 5 min`).
+- [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts): `useInstantData()` (query key `["sen","instant"]`, `refetchInterval 30s`).
+- React Query: `staleTime 60s`, `refetchOnWindowFocus: true` (revenirea pe tab reîmprospătează — live feedback, ca pe site-ul sursei), `retry: 1` (configurat în [`src/components/providers.tsx`](../src/components/providers.tsx)).
 - Exportul se face direct din browser: `window.open('/api/sen/export?…')` în [`filters.tsx`](../src/components/dashboard/filters.tsx).
 
 ## Note pentru dezvoltatori

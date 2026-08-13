@@ -2,15 +2,15 @@
 
 Dashboard interactiv pentru consumul și producția de energie din **Sistemul Energetic Național** al României, construit pe baza datelor publicate de **Transelectrica**.
 
-Datele acoperă intervalul **1 iulie 2026 → în prezent**, cu **5.606 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export). Setul crește **automat zilnic** (fetch incremental de pe site-ul live Transelectrica), iar dashboard-ul afișează și **datele live** (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
+Arhiva locală acoperă intervalul **1 iulie → 9 august 2026**, cu **5.606 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export); se extinde **automat zilnic** prin fetch incremental de pe site-ul live Transelectrica (deci intervalul rămâne la zi pe măsură ce datele noi sunt publicate). Dashboard-ul afișează **valori real-time** (Consum/Producție/Sold + mix, poll-uite la ~30s de pe `/sen-filter` — același endpoint pe care site-ul oficial îl actualizează la 10s) peste seria istorică (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
 
-![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-140%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
+![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-174%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 
 ---
 
 ## Funcționalități
 
-- **4 KPI-uri live**: consum curent, producție, pondere regenerabil, stare balanță (import/export).
+- **4 KPI-uri real-time**: consum curent, producție, pondere regenerabil, stare balanță (import/export) — actualizate la ~30s și la revenirea pe tab.
 - **Producția pe surse**: arie stivuită cu consum suprapus — cărbune, hidrocarburi, nuclear, ape, eolian, solar, biomasă.
 - **Consum vs. producție**: cerere și ofertă în intervalul selectat.
 - **Balanța energetică (Sold)**: pozitiv = import, negativ = export (semantica oficială `SOLD = CONS − PROD`), cu gradient divergent.
@@ -61,7 +61,7 @@ bun run start      # pornește serverul de producție din .next/standalone
 | `bun run dev`                     | Server de dezvoltare pe portul 3000                                                                                                                   |
 | `bun run build`                   | Build de producție (standalone + static)                                                                                                              |
 | `bun run start`                   | Pornește build-ul standalone                                                                                                                          |
-| `bun test`                        | Rulează cele 140 de teste unitare                                                                                                                     |
+| `bun test`                        | Rulează cele 174 de teste unitare                                                                                                                     |
 | `bun run typecheck`               | Verificare tipuri TypeScript (`tsc --noEmit`)                                                                                                         |
 | `bun run lint`                    | ESLint                                                                                                                                                |
 | `bun run format` / `format:check` | Prettier (scriere / verificare)                                                                                                                       |
@@ -89,15 +89,16 @@ API routes  →  React Query  →  Dashboard
 
 Stocare (ISPOZ):
 snapshot /sen-filter → data/sen-storage.json (capturi orare, workflow storage-capture)
-        │  src/lib/sen/storage.ts (server-only, TTL 10 min + fallback)
+        │  src/lib/sen/storage.ts (server-only, TTL 3 min + fallback)
         ▼
 /api/sen/storage  →  StorageCard (valoare + sparkline + trend)
 ```
 
 - **Convertor**: `scripts/convert-sen.py` (Python) — modul implicit citește foaia „Grafic SEN" din xlsx (openpyxl); modul `--fetch` descarcă **incremental** de pe endpoint-ul public Transelectrica (stdlib-only, fără openpyxl). Ambele normalizează timpul și valorile (elimină markerii `*`), sortează crescător și calculează summary-ul global.
 - **Date live la runtime**: `src/lib/sen/live.ts` face fetch la Transelectrica cu **cache TTL 10 min** și **fallback la datele stale din cache (max 24h) sau la cele statice** dacă fetch-ul eșuează — dashboard-ul rămâne funcțional oricând, dar afișează și cele mai recente date.
+- **Valori real-time**: `src/lib/sen/instant.ts` poll-uiește `/sen-filter` (TTL 10s server + polling client 30s + `refetchOnWindowFocus`) pentru Consum/Producție/Sold + mixul curent; la eșec UI-ul cade lin pe seria istorică. Graficele rămân la cadența reală a sursei (~10 min).
 - **Automatizare**: workflow-ul `.github/workflows/data-refresh.yml` rulează zilnic `bun run data:refresh` și face commit — istoricul crește singur, iar Vercel redeploy-ează automat (Git integration).
-- **Stocare (ISPOZ)**: Transelectrica expune stocarea doar ca snapshot (`/sen-filter`), fără istoric. Workflow-ul `.github/workflows/storage-capture.yml` (cron orar) rulează `python3 scripts/convert-sen.py --capture-storage` și acumulează puncte în `data/sen-storage.json`; la runtime `src/lib/sen/storage.ts` întreabă snapshot-ul live (TTL 10 min), cu fallback în ordine: **răspunsul live → snapshot-ul live stale din cache → ultima captură** (Transelectrica indisponibilă nu rupe site-ul).
+- **Stocare (ISPOZ)**: Transelectrica expune stocarea doar ca snapshot (`/sen-filter`), fără istoric. Workflow-ul `.github/workflows/storage-capture.yml` (cron orar) rulează `python3 scripts/convert-sen.py --capture-storage` și acumulează puncte în `data/sen-storage.json`; la runtime `src/lib/sen/storage.ts` întreabă snapshot-ul live (TTL 3 min), cu fallback în ordine: **răspunsul live → snapshot-ul live stale din cache → ultima captură** (Transelectrica indisponibilă nu rupe site-ul).
 
 > Notă: datele din fișierul sursă sunt etichetate cu anul 2026. Le afișăm fidel, așa cum apar în sursă, fără modificarea anului.
 
@@ -107,6 +108,7 @@ snapshot /sen-filter → data/sen-storage.json (capturi orare, workflow storage-
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/sen?from=<ts>&to=<ts>&granularity=raw\|10m\|hour\|day` | Puncte agregate în interval, cu statistici pe interval (consum/producție/sold, pondere regenerabil). La `raw` pe intervale mari se aplică downsampling uniform la 1.200 de puncte. |
 | `GET /api/sen/summary`                                           | KPI global precalculat: count, start/end, ultima înregistrare, statistici pe toate câmpurile, balanță import/export.                                                               |
+| `GET /api/sen/instant`                                           | Valori real-time (Consum/Producție/Sold + mix pe surse) — `null` la eșec/stale.                                                                                                    |
 | `GET /api/sen/storage`                                           | Stocare (ISPOZ): valoarea curentă + seria acumulată de capturi orare.                                                                                                              |
 | `GET /api/sen/export?from=<ts>&to=<ts>`                          | Export CSV (separator `;`, zecimal `.`) cu datele brute din interval.                                                                                                              |
 
@@ -122,12 +124,13 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ├── src/
 │   ├── app/
 │   │   ├── page.tsx              # Pagina principală (dashboard)
-│   │   └── api/sen/              # /api/sen, /api/sen/summary, /api/sen/storage, /api/sen/export
+│   │   └── api/sen/              # /api/sen, /api/sen/summary, /api/sen/instant, /api/sen/storage, /api/sen/export
 │   ├── components/
 │   │   ├── dashboard/            # KPI, grafice, filtre, tabel, header, footer
 │   │   └── ui/                   # shadcn/ui
 │   ├── hooks/
 │   │   ├── use-sen-data.ts       # React Query hooks
+│   │   ├── use-instant-data.ts   # React Query hook pentru valorile real-time (polling 30s)
 │   │   ├── use-storage-data.ts   # React Query hook pentru stocare (ISPOZ)
 │   │   ├── use-mounted.ts        # useSyncExternalStore (fix hidratare)
 │   │   └── use-local-preference.ts # Preferințe persistente (localStorage)
@@ -142,6 +145,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 │           ├── format.ts         # Formatare Intl ro-RO
 │           ├── loader.ts         # Citire fișiere JSON (server-only, cache)
 │           ├── live.ts           # Fetch live Transelectrica (server-only, TTL + fallback)
+│           ├── instant.ts        # Valori real-time /sen-filter (server-only, TTL + fallback)
 │           ├── storage.ts        # Stocare ISPOZ (server-only, snapshot live + serie)
 │           └── index.ts          # Barrel export (client-safe)
 ├── .github/workflows/            # data-refresh.yml (zilnic) + storage-capture.yml (orar)
@@ -150,8 +154,8 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ├── scripts/
 │   ├── convert-sen.py            # xlsx → JSON (convert) + fetch live incremental (refresh)
 │   └── check-hydration.sh        # CI check erori de hidratare
-├── tests/                        # 140 de teste unitare (aggregate, stats, format, live, storage, preferințe, captură)
-│   ├── sen/                      # tests/sen/*.test.ts
+├── tests/                        # 174 de teste unitare (aggregate, stats, format, live, instant, storage, preferințe, captură)
+│   ├── sen/                      # tests/sen/*.test.ts (aggregate, stats, format, live, instant)
 │   ├── storage.test.ts           # stocare ISPOZ (parser + cache + fallback + source)
 │   ├── capture-storage.test.ts   # logica Python de captură (--capture-storage, mock server)
 │   └── local-preference.test.ts  # preferințe UI persistente
@@ -163,7 +167,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ```bash
 bun run check       # totul într-o singură comandă (vezi mai jos)
 bun run typecheck   # TypeScript strict
-bun test            # 140 de teste unitare — toate trec
+bun test            # 174 de teste unitare — toate trec
 bun run lint        # ESLint curat
 bun run format:check
 bun run check:hydration  # fără erori de hidratare în browser (necesită agent-browser)
@@ -175,7 +179,7 @@ bun run check:hydration  # fără erori de hidratare în browser (necesită agen
 2. `docs:check` — documentația e la zi cu codul (hash-uri vs. fișiere sursă)
 3. `lint` — ESLint
 4. `typecheck` — `tsc --noEmit`
-5. `test` — 140 de teste unitare
+5. `test` — 174 de teste unitare
 6. `build` — build de producție (inclusiv validarea tipurilor)
 
 Rulează `bun run check` local înainte de fiecare release (sau într-un pipeline CI, dacă adaugi unul).

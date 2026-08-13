@@ -6,6 +6,52 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.24] — 2026-08-13, 17:02 EEST
+
+### Reparat
+
+- **Erorile HTTP non-5xx erau reîncercate în `fetchLiveReadings`** (`src/lib/sen/live.ts`, TO_FIX): un răspuns 4xx (ex: 403/404) arunca în interiorul `try`, dar catch-ul nu îl distingea de un eșec tranzitoriu → primea a doua încercare, deși comentariul din cod spunea că 4xx e determinist („n-ar ajuta”). Acum răspunsurile non-5xx sunt marcate `retryable: false` și re-aruncate imediat în catch; retry-ul rămâne doar pentru 5xx, rețea, timeout și body-stream. Teste de regresie noi (§4.14): 4xx → exact 1 apel, 0 reîncercări (pica pe codul anterior: 2 apeluri); 5xx → 1 retry apoi reușită.
+- **Același bug de retry pe 4xx exista și în `fetchCurrentInstant`** (`src/lib/sen/instant.ts`, găsit la code review după fix-ul din live.ts): un 4xx de la `/sen-filter` era reîncercat (catch-ul re-arunca doar `/payload invalid/`). Aplicat același pattern `retryable: false` + test de regresie (4xx → 1 apel, 0 reîncercări).
+- **Testul `AbortSignal` nu verifica pragul de 15s** (`tests/sen/live.test.ts`, TO_FIX): verifica doar că un `AbortSignal` e pasat la fetch, deci ar fi trecut și cu un timeout de 3s — nu prindea regresii de durată. `mock.timer()` nu există în Bun 1.3.14, deci pragul e verificat determinist prin `spyOn(AbortSignal, "timeout")`: trebuie apelat cu exact `15_000`; fetch-ul mock-uit confirmă că signal-ul e activ (nu aborted) la apel.
+
+### Documentat
+
+- Docs corectate pe baza verificării împotriva codului/datei reale (TO_FIX, toate confirmate):
+  - **README**: diagrama stocării declara TTL 10 min, dar `STORAGE_TTL_MS` e 3 min — corectat; intervalul arhivei locale era „1 iulie → în prezent”, dar `data/sen-data.json` se oprește la **9 august 2026** (5.606 înregistrări) — reformulat + refresh-ul incremental zilnic descris separat.
+  - **docs/01**: regula de layering menționa doar `loader.ts` ca excepție server-only — acum listează și `live.ts`, `storage.ts`, `instant.ts` (aliniat cu diagrama); intervalul datelor corectat la 09.08.2026.
+  - **docs/02**: adnotarea „fallback: summary.latest” era la nivel de route — clarificat că `/api/sen/instant` întoarce snapshot sau `null`, iar fallback-ul îl face UI-ul.
+  - **docs/04**: regula de import server-only omitea `instant.ts` — adăugat.
+  - **docs/05**: rândul `KpiCards` era lipit de `Filters` în tabel (celule în plus) — separat pe rând propriu.
+  - **docs/07**: pipes din invariantul anti-shift ne-escaped (rupeau tabelul) — escaped; descrierea testelor `live.test.ts` actualizată cu 4xx/5xx/AbortSignal; numărul de teste 171 → **174** în README, AGENTS și docs/07; `package.json` → 0.3.24.
+
+## [0.3.23] — 2026-08-13, 15:46 EEST
+
+### Adăugat
+
+- **Valori real-time (Consum/Producție/Sold + mix pe surse)** — site-ul oficial afișează bara „Consum / Producție / Sold” poll-uind `/sen-filter` la fiecare **10 secunde** (verificat în JS-ul lor: `setTimeout("STATE_SEN_Q()", 10000)`); noi foloseam doar seria istorică `sen-grafic` (cadență ~10 min), deci dashboard-ul părea „înghețat” față de al lor. Acum:
+  - **Modul nou** `src/lib/sen/instant.ts` (server-only, pattern `storage.ts`/`live.ts`): `parseInstantTimestamp` (`YY/MM/DD HH:MM:SS`, an 2 cifre, range-uri validate), `parseInstantPayload` (coduri SEN → câmpuri interne cu validare numerică strictă + **invariant anti-shift** `|sold − (consum − productie)| ≤ 5 MW` — pe datele reale sunt egali), `fetchCurrentInstant` (timeout 8s + 1 retry pe eșec tranzitoriu), `getInstantData` (TTL 10s + backoff 30s + inflight partajat + **guard prospețime**: snapshot > 30 min → `null`, ca badge-ul să nu mintă că e „live”).
+  - **Endpoint nou** `GET /api/sen/instant` (răspunde `null` la eșec/stale — fallback lin, site-ul nu se rupe) + tipul `InstantData` în `types.ts`.
+  - **UI**: KPI-urile, Mixul curent și badge-ul Header afișează snapshot-ul real-time când există (`liveLatest`/`latestOverride` în `page.tsx`/`kpi-cards.tsx`, `liveAt` în `header.tsx`), cu fallback pe seria istorică.
+- **Polling client (live feedback real)** — revenirea pe tab reîmprospătează, ca pe site-ul lor: `refetchOnWindowFocus: false → true` în `providers.tsx` + `refetchInterval` per hook (`useInstantData` 30s, `useSenSummary` 60s, `useStorageData` 60s, `useSenData`/grafice 5 min).
+- **Stocarea mai reactivă**: `STORAGE_TTL_MS` 10 min → **3 min** (cardul primește polling 60s, deci valoarea se actualizează la câteva minute, nu la o sesiune de vizitare).
+- **24 de teste unitare noi** (`tests/sen/instant.test.ts`, total **147 → 171**): parser timestamp + payload (inclusiv payload-ul real capturat), round-trip de calendar (30 feb / 31 apr respinse), invariant anti-shift, prospețime, fetch cu retry (1 încercare + 1 retry, fără retry pe payload invalid), cache TTL/backoff/inflight, guard prospețime (snapshot vechi → `null` fără cache). Toate verzi în ambele fusuri; proba pe `/sen-filter` real: invariant exact, snapshot la secunde.
+
+### Documentat
+
+- Docs 01–08 + README + AGENTS sincronizate (arhitectură, pipeline, API, strat de date, UI, teste — numărul de teste 147 → 171 peste tot, endpoint nou în liste, polling documentat); manifestul `docs/.docs-manifest.json` extins cu `instant.ts`, `use-instant-data.ts`, ruta `/api/sen/instant` și `instant.test.ts`; `package.json` → 0.3.23.
+
+## [0.3.22] — 2026-08-13, 14:50 EEST
+
+### Reparat
+
+- **Timeout-ul fetch-ului live era prea strâns (5s → 15s + 1 retry)** (`src/lib/sen/live.ts`): răspunsul real al endpoint-ului Transelectrica e ~3.9s (măsurat), iar 5s dădea timeout fals la orice vârf de trafic → fallback silențios pe seria arhivată (utilizatorul vedea date vechi de zile, ex. „9 august” pe 13 august). Acum: timeout 15s (marjă 4×) + **1 retry cu pauză 1s pe eșec tranzitoriu** (rețea/timeout/HTTP non-OK); validările de payload (gol / shift de coloane) NU se reîncearcă — sunt deterministe. Teste noi: retry-ul aduce datele live după un prim eșec (exact 2 apeluri) + `AbortSignal` activ la fetch.
+- **Datele vechi nu mai erau semnalate utilizatorului** (P2): vârsta reală a ultimei înregistrări e acum calculată pur în `format.ts` prin noua funcție `dataAgeMs(iso, now)` (logica candidaților DST `−2h`/`−3h` din `formatRelative` extrasă — același comportament, refactor); pragul de prospețime `LIVE_STALE_THRESHOLD_MS` (30 min) e centralizat în `constants.ts` (§4.5). În `header.tsx`, dacă vârsta depășește pragul, badge-ul devine avertisment chihlimbar cu `TriangleAlert` + text „live indisponibil — date din …”, iar `aria-label` descrie starea — utilizatorul vede clar când datele sunt vechi.
+- **Teste**: 140 → **147** (5 noi în `format.test.ts` pentru `dataAgeMs`: offset EEST, viitor negativ, granițe DST toamnă/primăvară, ora ambiguă; 2 noi în `live.test.ts` pentru retry + signal). Toate verzi în ambele fusuri.
+
+### Notă operațională (nu e un bug de cod)
+
+- Seria arhivată `data/sen-data.json` se oprește la 09.08.2026: refresh-ul zilnic e făcut de workflow-ul `data-refresh` (GitHub Actions), care rulează doar cu un remote GitHub configurat. Local, rulezi `bun run data:refresh` pentru a aduce fișierul la zi; la runtime, fix-ul de mai sus reduce drastic apariția datelor vechi (fetch mai tolerant + avertisment vizibil).
+
 ## [0.3.21] — 2026-08-13, 11:17 EEST
 
 ### Reparat

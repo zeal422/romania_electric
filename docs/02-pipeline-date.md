@@ -28,10 +28,16 @@ snapshot /sen-filter (transelectrica.ro/sen-filter, JSON cu coduri SEN)
         ▼
 data/sen-storage.json  ← capturi acumulate [{t, ts, ispoz}]
         │
-src/lib/sen/storage.ts ← încarcă seria + fetch snapshot live (TTL 10 min, fallback)
+src/lib/sen/storage.ts ← încarcă seria + fetch snapshot live (TTL 3 min, fallback)
         │
         ▼
 API route (/api/sen/storage)
+
+Valori real-time (Consum/Producție/Sold + mix pe surse):
+snapshot /sen-filter (coduri SEN → valori, același endpoint ca stocarea)
+        │  src/lib/sen/instant.ts (server-only, TTL 10s + backoff 30s)
+        ▼
+API route (/api/sen/instant) → snapshot sau `null` (eșec/stale) ← polling client 30s; fallback-ul pe `summary.latest` îl face UI-ul (nu route-ul)
 ```
 
 ## 1. Sursele datelor
@@ -134,7 +140,7 @@ Structura corespunde tipului [`SenSummaryResponse`](../src/lib/sen/types.ts).
 
 - `loadStorageHistory()` — seria acumulată (cache singleton, ordonată cronologic).
 - `extractIspoz(payload)` / `fetchCurrentIspoz()` — parse + fetch snapshot live (pure/testabile).
-- `getStorageData()` — valoarea curentă (snapshot live cu **TTL 10 min**, **fallback la ultima captură** la eșec, **backoff 1 min** după eșec) + seria completă → răspunsul `/api/sen/storage`.
+- `getStorageData()` — valoarea curentă (snapshot live cu **TTL 3 min** din 0.3.23 — cardul primește polling client la 60s, deci valoarea se poate actualiza la fiecare câteva minute; **fallback la ultima captură** la eșec, **backoff 1 min** după eșec) + seria completă → răspunsul `/api/sen/storage`.
 
 > **Nu modifica manual `data/sen-storage.json`** — e generat de `--capture-storage` (aceeași regulă ca `sen-data.json`).
 
@@ -143,9 +149,19 @@ Structura corespunde tipului [`SenSummaryResponse`](../src/lib/sen/types.ts).
 - `parseLiveLine` / `parseLivePayload` — parsează textul de la endpoint (funcții pure, testate).
 - `mergeReadings(static, live)` — dedupe pe `ts` (live câștigă), sortat crescător (pură).
 - `bucharestOffsetMs(date)` — offset-ul EET/EEST (+2h/+3h) după regulile UE, pentru capătul „end" al interogării (pură).
-- `fetchLiveReadings(fromTs, toTs)` — fetch cu `AbortSignal.timeout(5s)`; `buildLiveUrl` construiește query-ul. **Guard anti-shift**: `hasSuspiciousNightSolar` respinge payload-urile cu `foto > 50 MW` între 00-06h (solarul nu produce noaptea — fereastra acoperă noaptea fizică de vară: primul `foto > 50` real e la 06:13), ca un payload corupt să nu suprascrie rândurile statice bune prin dedupe.
+- `fetchLiveReadings(fromTs, toTs)` — fetch cu `AbortSignal.timeout(15s)` (răspuns real măsurat ~3.9s — 5s dădea timeout fals la vârfuri de trafic → fallback nemeritat pe arhivă; fix 0.3.22) și **1 retry pe eșec tranzitoriu** (rețea/timeout/body-stream/5xx, pauză 1s — 4xx determinist și payload-ul corupt nu se reîncearcă); `buildLiveUrl` construiește query-ul. **Guard anti-shift**: `hasSuspiciousNightSolar` respinge payload-urile cu `foto > 50 MW` între 00-06h (solarul nu produce noaptea — fereastra acoperă noaptea fizică de vară: primul `foto > 50` real e la 06:13), ca un payload corupt să nu suprascrie rândurile statice bune prin dedupe.
 - `getLiveReadings()` — date statice + live cu **cache TTL 10 min**; la eșec Transelectrica sau în backoff, folosește **fallback pe `liveCache` stale** (până la o limită de 24h) înainte de a reveni la datele statice pure, prevenind căderea bruscă a dashboard-ului la ultima dată din fișier. Include **backoff 1 min** la eșec și o **promisiune în zbor partajată** (`inflightFetch`) pentru requesturi concurente.
 - `getLiveSummary()` — summary-ul precalculat cu `latest`/`end`/`endTs`/`count` actualizate dacă live-ul a adus puncte mai noi.
+- **Server-only** (folosește `fetch` server-side) — nu importa în componente client.
+
+## 8. Valori real-time la runtime: `src/lib/sen/instant.ts`
+
+Site-ul oficial afișează Consum/Producție/Sold „real-time" poll-uind `/sen-filter` la **10 secunde** (verificat în JS-ul lor: `setTimeout("STATE_SEN_Q()", 10000)`). Noi folosim același endpoint pentru valorile instant — nu pentru serii (alea rămân pe `sen-grafic`, cadență reală ~10 min):
+
+- `parseInstantTimestamp(raw)` — `YY/MM/DD HH:MM:SS` (an 2 cifre: 70–99 → 19xx, 0–69 → 20xx; range-uri validate explicit, nu ne bazăm pe normalizarea `Date.UTC`) → `{t, ts}`, contract fake-UTC (pură, testată).
+- `parseInstantPayload(payload)` — mapează codurile SEN (CONS→consum, PROD→productie, SOLD→sold, CARB→carbune, GAZE→hidrocarburi, APE→ape, NUCL→nuclear, EOLIAN→eolian, FOTO→foto, BMASA→biomasa) cu validare numerică strictă (regex zecimal) + **invariant anti-shift** `|sold − (consum − productie)| ≤ 5 MW` (pe datele reale sunt EGALI); `null` dacă lipsește un câmp sau timestamp-ul (pură, testată).
+- `fetchCurrentInstant()` — fetch cu `AbortSignal.timeout(8s)` + **1 retry pe eșec tranzitoriu** (rețea/timeout/5xx — payload invalid fără retry, e determinist).
+- `getInstantData()` — snapshot cu **TTL 10s** + **backoff 30s** + promisiune în zbor partajată; **guard prospețime**: un snapshot mai vechi de `LIVE_STALE_THRESHOLD_MS` (30 min) NU e prezentat ca „live" (→ `null`, UI-ul cade pe `summary.latest`). La eșec → `null`; site-ul nu se rupe.
 - **Server-only** (folosește `fetch` server-side) — nu importa în componente client.
 
 ## Cum regenerezi datele

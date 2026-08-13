@@ -141,6 +141,32 @@ export interface StorageApiResponse {
   fetchedAt: number;
 }
 
+/**
+ * Snapshot-ul INSTANT („real-time”) al SEN, de la endpoint-ul `/sen-filter` al
+ * Transelectrica — aceleași valori pe care site-ul oficial le afișează în bara
+ * „Consum / Producție / Sold” (poll-uite de ei la fiecare 10 secunde).
+ *
+ * Câmpurile au aceleași nume ca `SenReading` (maparea codurilor SEN → câmpuri
+ * interne e în `instant.ts`), dar vin dintr-un payload separat, la granularitate
+ * de secunde — NU din seria istorică `sen-grafic` (~10 min).
+ */
+export interface InstantData {
+  /** ISO timestamp din payload (wall-clock RO etichetat UTC, secundă). */
+  t: string;
+  /** Epoch ms (Date.parse(t)) — contract fake-UTC, ca SenReading. */
+  ts: number;
+  consum: number;
+  productie: number;
+  sold: number;
+  carbune: number;
+  hidrocarburi: number;
+  ape: number;
+  nuclear: number;
+  eolian: number;
+  foto: number;
+  biomasa: number;
+}
+
 /** Răspunsul endpoint-ului /api/sen/summary. */
 export interface SenSummaryResponse {
   /**

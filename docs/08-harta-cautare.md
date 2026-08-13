@@ -6,31 +6,36 @@
 
 ### Date & logică
 
-| Întrebare                                                       | Fișier                                                                                                                                          |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unde e structura unei înregistrări (ce câmpuri are)?            | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `SenReading`                                                                                |
-| Cum se agregă datele pe bucket-uri (10m/oră/zi)?                | [`src/lib/sen/aggregate.ts`](../src/lib/sen/aggregate.ts)                                                                                       |
-| Cum se calculează media/statistici/pondere regenerabil/balanță? | [`src/lib/sen/stats.ts`](../src/lib/sen/stats.ts)                                                                                               |
-| Cum se formatează numerele/datele în ro-RO?                     | [`src/lib/sen/format.ts`](../src/lib/sen/format.ts)                                                                                             |
-| Ce culori/etichete au sursele de energie?                       | [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts)                                                                                       |
-| De unde citesc serverul datele (JSON)?                          | [`src/lib/sen/loader.ts`](../src/lib/sen/loader.ts)                                                                                             |
-| Ce granularități există?                                        | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `Granularity` + `GRANULARITIES` (sursă unică)                                               |
-| Care sunt granularitățile compatibile cu un preset?             | `granularitiesForPreset` în [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) (sursă unică UI + normalizare)                                    |
-| Cum se convertește xlsx-ul în JSON?                             | [`scripts/convert-sen.py`](../scripts/convert-sen.py)                                                                                           |
-| Unde sunt datele?                                               | `data/sen-data.json`, `data/sen-summary.json`                                                                                                   |
-| De unde vine fișierul sursă?                                    | `upload/Grafic_SEN.xlsx`                                                                                                                        |
-| Unde e logica de stocare (ISPOZ)?                               | [`src/lib/sen/storage.ts`](../src/lib/sen/storage.ts) (server-only) + [`scripts/convert-sen.py`](../scripts/convert-sen.py) `--capture-storage` |
-| Unde e seria capturată de stocare?                              | `data/sen-storage.json` (generată orar de workflow-ul `storage-capture`)                                                                        |
+| Întrebare                                                           | Fișier                                                                                                                                                                                             |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unde e structura unei înregistrări (ce câmpuri are)?                | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `SenReading`                                                                                                                                   |
+| Cum se agregă datele pe bucket-uri (10m/oră/zi)?                    | [`src/lib/sen/aggregate.ts`](../src/lib/sen/aggregate.ts)                                                                                                                                          |
+| Cum se calculează media/statistici/pondere regenerabil/balanță?     | [`src/lib/sen/stats.ts`](../src/lib/sen/stats.ts)                                                                                                                                                  |
+| Cum se formatează numerele/datele în ro-RO?                         | [`src/lib/sen/format.ts`](../src/lib/sen/format.ts)                                                                                                                                                |
+| Cum calculez vârsta reală a unei înregistrări (badge „actualizat")? | `dataAgeMs` + `formatRelative` în [`src/lib/sen/format.ts`](../src/lib/sen/format.ts); pragul de prospețime `LIVE_STALE_THRESHOLD_MS` în [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts) |
+| De unde vine fetch-ul live (serii, timeout/retry/fallback)?         | [`src/lib/sen/live.ts`](../src/lib/sen/live.ts) — server-only (timeout 15s + 1 retry, TTL 10 min, fallback `liveCache` stale 24h / statice)                                                        |
+| De unde vin valorile real-time (Consum/Producție/Sold + mix)?       | [`src/lib/sen/instant.ts`](../src/lib/sen/instant.ts) — server-only (TTL 10s + backoff 30s, invariant anti-shift, fallback `null` → summary.latest)                                                |
+| Cum se reîmprospătează pagina (polling / revenire pe tab)?          | `refetchOnWindowFocus: true` în [`src/components/providers.tsx`](../src/components/providers.tsx) + `refetchInterval` per hook: instant 30s, summary/storage 60s, grafice 5 min                    |
+| Ce culori/etichete au sursele de energie?                           | [`src/lib/sen/constants.ts`](../src/lib/sen/constants.ts)                                                                                                                                          |
+| De unde citesc serverul datele (JSON)?                              | [`src/lib/sen/loader.ts`](../src/lib/sen/loader.ts)                                                                                                                                                |
+| Ce granularități există?                                            | [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) — `Granularity` + `GRANULARITIES` (sursă unică)                                                                                                  |
+| Care sunt granularitățile compatibile cu un preset?                 | `granularitiesForPreset` în [`src/lib/sen/types.ts`](../src/lib/sen/types.ts) (sursă unică UI + normalizare)                                                                                       |
+| Cum se convertește xlsx-ul în JSON?                                 | [`scripts/convert-sen.py`](../scripts/convert-sen.py)                                                                                                                                              |
+| Unde sunt datele?                                                   | `data/sen-data.json`, `data/sen-summary.json`                                                                                                                                                      |
+| De unde vine fișierul sursă?                                        | `upload/Grafic_SEN.xlsx`                                                                                                                                                                           |
+| Unde e logica de stocare (ISPOZ)?                                   | [`src/lib/sen/storage.ts`](../src/lib/sen/storage.ts) (server-only) + [`scripts/convert-sen.py`](../scripts/convert-sen.py) `--capture-storage`                                                    |
+| Unde e seria capturată de stocare?                                  | `data/sen-storage.json` (generată orar de workflow-ul `storage-capture`)                                                                                                                           |
 
 ### API
 
-| Întrebare                       | Fișier                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------- |
-| Ce face `GET /api/sen`?         | [`src/app/api/sen/route.ts`](../src/app/api/sen/route.ts)                 |
-| Ce face `GET /api/sen/summary`? | [`src/app/api/sen/summary/route.ts`](../src/app/api/sen/summary/route.ts) |
-| Ce face `GET /api/sen/export`?  | [`src/app/api/sen/export/route.ts`](../src/app/api/sen/export/route.ts)   |
-| Ce face `GET /api/sen/storage`? | [`src/app/api/sen/storage/route.ts`](../src/app/api/sen/storage/route.ts) |
-| Cum apelează clientul API-ul?   | [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts)               |
+| Întrebare                       | Fișier                                                                                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Ce face `GET /api/sen`?         | [`src/app/api/sen/route.ts`](../src/app/api/sen/route.ts)                                                                         |
+| Ce face `GET /api/sen/summary`? | [`src/app/api/sen/summary/route.ts`](../src/app/api/sen/summary/route.ts)                                                         |
+| Ce face `GET /api/sen/export`?  | [`src/app/api/sen/export/route.ts`](../src/app/api/sen/export/route.ts)                                                           |
+| Ce face `GET /api/sen/storage`? | [`src/app/api/sen/storage/route.ts`](../src/app/api/sen/storage/route.ts)                                                         |
+| Ce face `GET /api/sen/instant`? | [`src/app/api/sen/instant/route.ts`](../src/app/api/sen/instant/route.ts) — valori real-time (`null` la eșec)                     |
+| Cum apelează clientul API-ul?   | [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts) + [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts) |
 
 ### UI
 
@@ -42,6 +47,7 @@
 | Cum arată donut-ul cu mixul curent?                                   | [`src/components/dashboard/source-distribution.tsx`](../src/components/dashboard/source-distribution.tsx)                                                                            |
 | Cum arată cardul de stocare (ISPOZ)?                                  | [`src/components/dashboard/storage-card.tsx`](../src/components/dashboard/storage-card.tsx)                                                                                          |
 | De unde ia cardul de stocare datele?                                  | [`src/hooks/use-storage-data.ts`](../src/hooks/use-storage-data.ts) → `GET /api/sen/storage`                                                                                         |
+| De unde vin valorile instant în KPI/Mix/Header?                       | [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts) → `GET /api/sen/instant` (polling 30s)                                                                           |
 | Cum arată consum vs producție?                                        | [`src/components/dashboard/demand-supply-chart.tsx`](../src/components/dashboard/demand-supply-chart.tsx)                                                                            |
 | Cum arată balanța import/export?                                      | [`src/components/dashboard/balance-chart.tsx`](../src/components/dashboard/balance-chart.tsx)                                                                                        |
 | Cum arată tabelul de date?                                            | [`src/components/dashboard/data-table.tsx`](../src/components/dashboard/data-table.tsx)                                                                                              |

@@ -18,11 +18,17 @@ import { SourceLegend } from "@/components/dashboard/source-legend";
 import { StorageCard } from "@/components/dashboard/storage-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useInstantData } from "@/hooks/use-instant-data";
 import { useLocalPreference } from "@/hooks/use-local-preference";
 import { useSenData, useSenSummary } from "@/hooks/use-sen-data";
 import { SOURCE_ORDER } from "@/lib/sen/constants";
 import { formatNumber } from "@/lib/sen/format";
-import { GRANULARITIES, granularitiesForPreset, type Granularity } from "@/lib/sen/types";
+import {
+  GRANULARITIES,
+  granularitiesForPreset,
+  type Granularity,
+  type SenReading,
+} from "@/lib/sen/types";
 
 const PRESET_IDS = RANGE_PRESETS.map((p) => p.id);
 
@@ -38,6 +44,8 @@ function isGranularity(v: string): v is Granularity {
 export default function Home() {
   const summaryQuery = useSenSummary();
   const summary = summaryQuery.data;
+  const instantQuery = useInstantData();
+  const instant = instantQuery.data ?? undefined;
 
   // Preferințele de filtrare persistă în localStorage (revine la ele la refresh).
   const [activePreset, setActivePreset] = useLocalPreference<string>(
@@ -56,6 +64,31 @@ export default function Home() {
     const latest = summary.latest;
     return [...SOURCE_ORDER].sort((a, b) => (latest[b] ?? 0) - (latest[a] ?? 0));
   }, [summary]);
+
+  /**
+   * „Ultima înregistrare” afișată: când valorile INSTANT (/sen-filter) există,
+   * le suprapunem peste summary.latest (KPI + Mixul curent arată starea
+   * real-time); la eșec instant → summary.latest (fallback lin, fără crash).
+   */
+  const liveLatest = useMemo<SenReading | undefined>(() => {
+    if (!summary?.latest) return undefined;
+    if (!instant) return summary.latest;
+    return {
+      ...summary.latest,
+      t: instant.t,
+      ts: instant.ts,
+      consum: instant.consum,
+      productie: instant.productie,
+      sold: instant.sold,
+      carbune: instant.carbune,
+      hidrocarburi: instant.hidrocarburi,
+      ape: instant.ape,
+      nuclear: instant.nuclear,
+      eolian: instant.eolian,
+      foto: instant.foto,
+      biomasa: instant.biomasa,
+    };
+  }, [summary, instant]);
 
   const endTs = summary?.endTs ?? 0;
 
@@ -95,7 +128,7 @@ export default function Home() {
   return (
     <div className="bg-aura-light dark:bg-aura-dark flex min-h-screen flex-col bg-background">
       <GlobalHoverSync />
-      <Header summary={summary} />
+      <Header summary={summary} liveAt={instant?.t} />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 sm:px-6">
         {/* Bară de filtre */}
@@ -131,7 +164,9 @@ export default function Home() {
             </AlertDescription>
           </Alert>
         )}
-        {summary && <KpiCards summary={summary} renewableShare={renewableShare} />}
+        {summary && (
+          <KpiCards summary={summary} renewableShare={renewableShare} latestOverride={liveLatest} />
+        )}
 
         {/* Grid principal: producție pe surse (mare) + distribuție curentă (sidebar) */}
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -159,7 +194,7 @@ export default function Home() {
               chartHeight={360}
               contentClassName="!h-auto"
             >
-              <SourceDistribution latest={summary?.latest} />
+              <SourceDistribution latest={liveLatest} />
             </SectionCard>
             <StorageCard />
           </div>

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 import {
   bucharestOffsetMs,
   buildLiveUrl,
+  fetchLiveReadings,
   getLiveReadings,
   getLiveSummary,
   hasSuspiciousNightSolar,
@@ -206,6 +207,88 @@ describe("getLiveReadings / getLiveSummary (fetch mock-uit)", () => {
 
     const readings = await getLiveReadings();
     // Nu aruncă: întoarce datele statice, fără citirile live.
+    expect(readings.length).toBeGreaterThan(0);
+  });
+
+  it("retries once when the first attempt fails transiently, then succeeds", async () => {
+    const livePayload = await payloadNewerThanStatic();
+    let calls = 0;
+    globalThis.fetch = mock(async () => {
+      calls++;
+      if (calls === 1) throw new Error("Transelectrica timeout / network down");
+      return new Response(livePayload, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const readings = await getLiveReadings();
+    // Al doilea răspuns (după retry) aduce citirile live noi.
+    const { endTs } = await loadSummary();
+    const last = readings[readings.length - 1];
+    expect(last.ts).toBe(endTs + 20 * 60_000);
+    expect(calls).toBe(2); // exact 1 reîncercare
+  });
+
+  it("passes an AbortSignal cu pragul exact de 15s (pică dacă timeout-ul e scurtat)", async () => {
+    const livePayload = await payloadNewerThanStatic();
+    // `mock.timer()` nu există în Bun 1.3.14, deci nu putem avansa timers controlate.
+    // Verificăm pragul determinist prin spy pe `AbortSignal.timeout`: trebuie apelat
+    // cu exact FETCH_TIMEOUT_MS (15_000). Dacă cineva scurtează timeout-ul,
+    // `requestedMs` nu mai e 15_000 și testul pică — regresia e prinsă fără 15s reali.
+    const originalTimeout = AbortSignal.timeout;
+    let requestedMs: number | undefined;
+    const timeoutSpy = spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+      requestedMs = ms;
+      return originalTimeout.call(AbortSignal, ms);
+    });
+
+    try {
+      let capturedSignal: AbortSignal | null | undefined;
+      globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        capturedSignal = init?.signal ?? undefined;
+        // Fetch-ul se rezolvă imediat (răspuns mock-uit), deci signal-ul trebuie
+        // să rămână ACTIV la momentul apelului — nu aborted înainte de prag.
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        expect(init?.signal?.aborted).toBe(false);
+        return new Response(livePayload, { status: 200 });
+      }) as unknown as typeof fetch;
+
+      await getLiveReadings();
+
+      // Pragul configurat e exact 15s — dacă timeout-ul e scurtat, testul pică aici.
+      expect(requestedMs).toBe(15_000);
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
+  it("does NOT retry 4xx HTTP errors (deterministic, non-retryable)", async () => {
+    let calls = 0;
+    globalThis.fetch = mock(async () => {
+      calls++;
+      return new Response("nope", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const { endTs } = await loadSummary();
+    // 4xx e determinist — fetchLiveReadings aruncă imediat, fără a doua încercare.
+    await expect(fetchLiveReadings(endTs, endTs + 3_600_000)).rejects.toThrow(
+      "Transelectrica live HTTP 404",
+    );
+    expect(calls).toBe(1); // exact 1 apel, 0 reîncercări
+  });
+
+  it("retries 5xx HTTP errors once, then succeeds", async () => {
+    const livePayload = await payloadNewerThanStatic();
+    let calls = 0;
+    globalThis.fetch = mock(async () => {
+      calls++;
+      if (calls === 1) return new Response("server error", { status: 503 });
+      return new Response(livePayload, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const { endTs } = await loadSummary();
+    const readings = await fetchLiveReadings(endTs, endTs + 3_600_000);
+    // 5xx = tranzitoriu → exact 1 reîncercare, apoi reușită.
+    expect(calls).toBe(2);
     expect(readings.length).toBeGreaterThan(0);
   });
 

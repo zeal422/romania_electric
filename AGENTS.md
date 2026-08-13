@@ -18,7 +18,7 @@ Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**,
 bun install            # instalează dependențele (Bun, NU npm/pnpm/yarn)
 bun run dev            # server de dezvoltare pe :3000
 bun run check          # CI complet: format → docs → lint → typecheck → teste → build
-bun test               # 140 de teste unitare — TOATE trebuie să treacă
+bun test               # 174 de teste unitare — TOATE trebuie să treacă
 bun run typecheck      # tsc --noEmit — trebuie să fie curat
 bun run lint           # ESLint — trebuie să fie curat
 bun run format:check   # Prettier — trebuie să fie curat
@@ -34,15 +34,16 @@ bun run check:hydration  # verifică erori de hidratare în browser (necesită a
 
 ```
 src/lib/sen/        ← LOGICA DE DATE. Pură, tipizată, deterministă, testată.
-src/lib/sen/live.ts ← date live Transelectrica (server-only: fetch TTL + fallback static).
+src/lib/sen/live.ts ← date live Transelectrica, serii (server-only: fetch TTL + fallback static).
+src/lib/sen/instant.ts ← valori real-time /sen-filter (server-only: TTL scurt + fallback null → summary.latest).
 src/lib/sen/storage.ts ← stocare ISPOZ (server-only: snapshot live TTL + serie orară acumulată).
-src/app/api/sen/    ← API routes subțiri (fără logică de business) — incl. /api/sen/storage.
-src/hooks/          ← Hook-uri client (React Query) — incl. use-storage-data.ts.
+src/app/api/sen/    ← API routes subțiri (fără logică de business) — incl. /api/sen/storage + /api/sen/instant.
+src/hooks/          ← Hook-uri client (React Query) — incl. use-storage-data.ts + use-instant-data.ts.
 src/components/dashboard/ ← UI dashboard (incl. storage-card.tsx). src/components/ui/ = shadcn/ui (nu modifica de mână).
 data/               ← sen-data.json + sen-summary.json + sen-storage.json (GENERATE, nu le edita manual).
 scripts/            ← convert-sen.py (pipeline date + --capture-storage) + check-hydration.sh (CI).
 .github/workflows/  ← data-refresh.yml (zilnic) + storage-capture.yml (orar).
-tests/              ← 140 de teste unitare (lib/sen + storage + captură Python + preferințe).
+tests/              ← 174 de teste unitare (lib/sen + storage + instant + captură Python + preferințe).
 upload/             ← Grafic_SEN.xlsx (sursa datelor).
 ```
 
@@ -50,7 +51,7 @@ upload/             ← Grafic_SEN.xlsx (sursa datelor).
 
 ### 4.1. Loader-ul și datele live rulează DOAR pe server
 
-`src/lib/sen/loader.ts` (fișiere JSON) și `src/lib/sen/live.ts` (fetch la Transelectrica) folosesc `node:fs` / `fetch` server-side. **Nu le importa în cod de client** (componente `"use client"`, hooks, `page.tsx` care e client). Barrel-ul `@/lib/sen` (`index.ts`) e **client-safe** (doar logică pură) — `loader`/`live` nu trec prin el; API routes le importă direct. Dacă ai nevoie de date pe client, folosește hook-urile din `src/hooks/use-sen-data.ts` (React Query + fetch la `/api/sen*`).
+`src/lib/sen/loader.ts` (fișiere JSON) și `src/lib/sen/live.ts` / `src/lib/sen/instant.ts` (fetch la Transelectrica) folosesc `node:fs` / `fetch` server-side. **Nu le importa în cod de client** (componente `"use client"`, hooks, `page.tsx` care e client). Barrel-ul `@/lib/sen` (`index.ts`) e **client-safe** (doar logică pură) — `loader`/`live` nu trec prin el; API routes le importă direct. Dacă ai nevoie de date pe client, folosește hook-urile din `src/hooks/use-sen-data.ts` (React Query + fetch la `/api/sen*`).
 
 ### 4.2. Logica de date rămâne pură
 
@@ -75,7 +76,7 @@ Totul despre surse (culori semantice, etichete, ordinea de afișare, clasificare
 
 ### 4.6. Granularități și API — nu inventa
 
-Granularități valide: `raw` | `10m` | `hour` | `day` (vezi `types.ts`). Endpoint-uri existente: `/api/sen`, `/api/sen/summary`, `/api/sen/storage`, `/api/sen/export`. Parametrii `from`/`to` sunt **epoch ms**. La `raw` pe intervale mari, API-ul face downsampling la 1.200 de puncte — nu „corecta" asta, e protecție intenționată pentru client.
+Granularități valide: `raw` | `10m` | `hour` | `day` (vezi `types.ts`). Endpoint-uri existente: `/api/sen`, `/api/sen/summary`, `/api/sen/instant`, `/api/sen/storage`, `/api/sen/export`. Polling-ul client (valori real-time) e intenționat: `refetchOnWindowFocus: true` + `refetchInterval` per hook (instant 30s, summary/storage 60s, grafice 5 min) — nu-l elimina, e funcționalitatea „live". Parametrii `from`/`to` sunt **epoch ms**. La `raw` pe intervale mari, API-ul face downsampling la 1.200 de puncte — nu „corecta" asta, e protecție intenționată pentru client.
 
 ### 4.7. Timestamps: afișează fidel, nu „repara" anul
 

@@ -27,8 +27,10 @@ export const STORAGE_URL = "https://www.transelectrica.ro/sen-filter";
 const STORAGE_PATH = path.join(process.cwd(), "data", "sen-storage.json");
 
 // TTL pentru snapshot-ul live la /sen-filter; captura orară (workflow-ul
-// storage-capture, 1/h) e independentă de acest TTL.
-const STORAGE_TTL_MS = 10 * 60 * 1000;
+// storage-capture, 1/h) e independentă de acest TTL. 3 min (nu 10) din 0.3.23:
+// cardul de stocare primește polling client la 60s, deci valoarea curentă
+// trebuie să se poată actualiza ~la fiecare câteva minute (live feedback).
+const STORAGE_TTL_MS = 3 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 5_000; // scurt: la eșec folosim fallback-ul, prospețimea nu e critică
 const FETCH_FAIL_TTL_MS = 60 * 1000; // backoff la eșec: nu relovim endpoint-ul timp de 1 minut
 

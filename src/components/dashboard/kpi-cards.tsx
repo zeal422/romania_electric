@@ -5,11 +5,18 @@ import { ArrowDownRight, ArrowUpRight, Leaf, Minus, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SERIES_COLORS } from "@/lib/sen/constants";
 import { formatNumber, formatPercent, formatSigned, formatSold } from "@/lib/sen/format";
-import type { SenSummaryResponse } from "@/lib/sen/types";
+import type { SenReading, SenSummaryResponse } from "@/lib/sen/types";
 
 interface KpiCardsProps {
   summary: SenSummaryResponse | undefined;
   renewableShare: number | undefined;
+  /**
+   * Valoarea „ultimei înregistrări” folosită de carduri. Implicit e
+   * `summary.latest` (seria istorică); când există, page.tsx trece aici
+   * `liveLatest` = summary.latest + valorile INSTANT din /sen-filter, ca
+   * KPI-urile să reflecte starea real-time, cu fallback lin la istoric.
+   */
+  latestOverride?: SenReading | undefined;
 }
 
 interface KpiCardData {
@@ -29,8 +36,8 @@ interface KpiCardData {
  * Rând de 4 carduri KPI: consum curent, producție curentă, sold (import/export)
  * și share-ul regenerabil. Compară cu media intervalului pentru context.
  */
-export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
-  const latest = summary?.latest;
+export function KpiCards({ summary, renewableShare, latestOverride }: KpiCardsProps) {
+  const latest = latestOverride ?? summary?.latest;
   const stats = summary?.stats;
 
   const cards: KpiCardData[] = [

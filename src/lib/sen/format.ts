@@ -137,7 +137,8 @@ export function bucharestOffsetMs(date: Date): number {
 }
 
 /**
- * Etichetă relativă pentru interval: "acum 10 min", "acum 2 ore".
+ * Vârsta reală (ms) a unei înregistrări față de `now` — baza de calcul a
+ * `formatRelative` și pragul de prospețime din UI.
  *
  * Contract fake-UTC: eticheta ISO e wall-clock RO etichetat UTC, deci instanța UTC
  * reală a înregistrării e `eticheta − offset RO`. Offset-ul exact (EET/EEST) depinde
@@ -152,7 +153,7 @@ export function bucharestOffsetMs(date: Date): number {
  * (AGENTS §4.2): apelanții decid momentul de referință (UI-ul trece `Date.now()`),
  * testele trec valori fixe.
  */
-export function formatRelative(iso: string, now: number): string {
+export function dataAgeMs(iso: string, now: number): number {
   const targetMs = new Date(iso).getTime();
 
   let resolved = targetMs;
@@ -164,7 +165,16 @@ export function formatRelative(iso: string, now: number): string {
   const past = candidates.filter((c) => c <= now);
   if (past.length > 0) resolved = Math.max(...past);
 
-  const diffMs = now - resolved;
+  return now - resolved;
+}
+
+/**
+ * Etichetă relativă pentru interval: "acum 10 min", "acum 2 ore".
+ * Bazată pe `dataAgeMs` (aceeași rezolvare a instanței reale fake-UTC).
+ * `now` e obligatoriu — vezi `dataAgeMs`.
+ */
+export function formatRelative(iso: string, now: number): string {
+  const diffMs = dataAgeMs(iso, now);
   const min = Math.round(diffMs / 60000);
   if (min < 1) return "acum câteva secunde";
   if (min < 60) return `acum ${min} min`;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  dataAgeMs,
   formatAxisTick,
   formatDate,
   formatDateTime,
@@ -176,6 +177,44 @@ describe("formatRelative", () => {
     expect(formatRelative("2026-03-29T01:30:00.000Z", Date.parse("2026-03-29T02:30:00.000Z"))).toBe(
       "acum 3 ore",
     );
+  });
+});
+
+describe("dataAgeMs", () => {
+  // Contract fake-UTC: eticheta ISO e wall-clock RO etichetat UTC. În vară (EEST),
+  // instanța UTC reală a lui "2026-08-08T10:00:00.000Z" e 07:00 UTC.
+  const iso = "2026-08-08T10:00:00.000Z";
+  const resolved = Date.parse(iso) - 3 * 3600_000; // 07:00 UTC
+
+  it("returns the real age in ms (fake-UTC offset applied)", () => {
+    expect(dataAgeMs(iso, resolved)).toBe(0);
+    expect(dataAgeMs(iso, resolved + 5 * 60_000)).toBe(5 * 60_000);
+    expect(dataAgeMs(iso, resolved + 2 * 3600_000)).toBe(2 * 3600_000);
+  });
+
+  it("is negative for future timestamps (no candidate in the past)", () => {
+    // Niciun candidat real (eticheta −2h/−3h) nu e ≤ now → fallback pe eticheta însăși;
+    // rezultatul e negativ (semnul contează: înregistrare în viitor → nu e „veche").
+    expect(dataAgeMs(iso, resolved - 60_000)).toBeLessThan(0);
+  });
+
+  it("matches formatRelative bucket boundaries (DST fall-back)", () => {
+    // Aceeași instanță ca testul DST din formatRelative: eticheta 01:30Z pe 25 oct
+    // = wall-clock 01:30 RO în EEST → real 22:30 UTC (24 oct). La now 02:30 UTC → 4h.
+    const now = Date.parse("2026-10-25T02:30:00.000Z");
+    expect(dataAgeMs("2026-10-25T01:30:00.000Z", now)).toBe(4 * 3600_000);
+  });
+
+  it("resolves the ambiguous fall-back hour to the latest instant not after now", () => {
+    // Eticheta 03:30Z pe 25 oct corespunde la 2 instanțe; la now 01:00:30 UTC doar
+    // prima (00:30 UTC) e în trecut → vârsta 30.5 min.
+    const now = Date.parse("2026-10-25T01:00:30.000Z");
+    expect(dataAgeMs("2026-10-25T03:30:00.000Z", now)).toBe(30 * 60_000 + 30_000);
+  });
+
+  it("resolves March DST spring-forward timestamps (same as formatRelative)", () => {
+    const now = Date.parse("2026-03-29T02:30:00.000Z");
+    expect(dataAgeMs("2026-03-29T01:30:00.000Z", now)).toBe(3 * 3600_000);
   });
 });
 
