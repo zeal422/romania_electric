@@ -4,7 +4,7 @@ Dashboard interactiv pentru consumul și producția de energie din **Sistemul En
 
 Datele acoperă intervalul **1 iulie 2026 → în prezent**, cu **5.606 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export). Setul crește **automat zilnic** (fetch incremental de pe site-ul live Transelectrica), iar dashboard-ul afișează și **datele live** (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
 
-![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-131%20unit%C4%83%C8%9Bi-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
+![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-140%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 
 ---
 
@@ -61,7 +61,7 @@ bun run start      # pornește serverul de producție din .next/standalone
 | `bun run dev`                     | Server de dezvoltare pe portul 3000                                                                                                                   |
 | `bun run build`                   | Build de producție (standalone + static)                                                                                                              |
 | `bun run start`                   | Pornește build-ul standalone                                                                                                                          |
-| `bun test`                        | Rulează cele 131 teste unitare                                                                                                                        |
+| `bun test`                        | Rulează cele 140 de teste unitare                                                                                                                     |
 | `bun run typecheck`               | Verificare tipuri TypeScript (`tsc --noEmit`)                                                                                                         |
 | `bun run lint`                    | ESLint                                                                                                                                                |
 | `bun run format` / `format:check` | Prettier (scriere / verificare)                                                                                                                       |
@@ -150,7 +150,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ├── scripts/
 │   ├── convert-sen.py            # xlsx → JSON (convert) + fetch live incremental (refresh)
 │   └── check-hydration.sh        # CI check erori de hidratare
-├── tests/                        # 131 teste unitare (aggregate, stats, format, live, storage, preferințe, captură)
+├── tests/                        # 140 de teste unitare (aggregate, stats, format, live, storage, preferințe, captură)
 │   ├── sen/                      # tests/sen/*.test.ts
 │   ├── storage.test.ts           # stocare ISPOZ (parser + cache + fallback + source)
 │   ├── capture-storage.test.ts   # logica Python de captură (--capture-storage, mock server)
@@ -163,7 +163,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ```bash
 bun run check       # totul într-o singură comandă (vezi mai jos)
 bun run typecheck   # TypeScript strict
-bun test            # 131 teste unitare — toate trec
+bun test            # 140 de teste unitare — toate trec
 bun run lint        # ESLint curat
 bun run format:check
 bun run check:hydration  # fără erori de hidratare în browser (necesită agent-browser)
@@ -175,7 +175,7 @@ bun run check:hydration  # fără erori de hidratare în browser (necesită agen
 2. `docs:check` — documentația e la zi cu codul (hash-uri vs. fișiere sursă)
 3. `lint` — ESLint
 4. `typecheck` — `tsc --noEmit`
-5. `test` — 131 teste unitare
+5. `test` — 140 de teste unitare
 6. `build` — build de producție (inclusiv validarea tipurilor)
 
 Rulează `bun run check` local înainte de fiecare release (sau într-un pipeline CI, dacă adaugi unul).

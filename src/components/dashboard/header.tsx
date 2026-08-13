@@ -18,7 +18,7 @@ interface HeaderProps {
 export function Header({ summary }: HeaderProps) {
   const latestIso = summary?.latest?.t;
   const lastUpdated = latestIso ? formatDateTime(latestIso, { withYear: true }) : "—";
-  const relative = latestIso ? formatRelative(latestIso) : null;
+  const relative = latestIso ? formatRelative(latestIso, Date.now()) : null;
 
   return (
     <header className="sticky top-0 z-40 glass-header">

@@ -79,7 +79,7 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
           }
           cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 3" }}
         />
-        {SOURCE_ORDER.map((f, i) => (
+        {SOURCE_ORDER.map((f) => (
           <Area
             key={f}
             type="monotone"
@@ -88,7 +88,6 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
             stackId="sources"
             stroke={SOURCES[f].color}
             fill={`url(#grad-${f})`}
-            order={SOURCE_ORDER.length - i}
             isAnimationActive={false}
             className={`area-${f}`}
             onMouseEnter={() => setHoveredSource(f)}

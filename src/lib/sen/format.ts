@@ -115,9 +115,56 @@ export function formatTime(iso: string): string {
   return `${hh}:${mm}`;
 }
 
-/** Etichetă relativă pentru interval: "acum 10 min", "acum 2 ore". */
-export function formatRelative(iso: string, now = Date.now()): string {
-  const diffMs = now - new Date(iso).getTime();
+/**
+ * Offset-ul UTC (ms) al orei României pentru o dată: +3h EEST (vară), +2h EET (iarnă).
+ * Reguli UE: EEST începe ultima duminică din martie la 01:00 UTC și se termină
+ * ultima duminică din octombrie la 01:00 UTC.
+ *
+ * Parametrul e obligatoriu (fără default `new Date()`) — funcția trebuie să rămână
+ * pură/deterministă (AGENTS §4.2): apelanții decid instanța, nu timpul curent.
+ */
+export function bucharestOffsetMs(date: Date): number {
+  const y = date.getUTCFullYear();
+  const lastSunday = (year: number, monthIndex: number): number => {
+    const last = new Date(Date.UTC(year, monthIndex + 1, 0, 12));
+    const back = last.getUTCDay(); // 0 = duminică
+    return Date.UTC(year, monthIndex, last.getUTCDate() - back, 1); // 01:00 UTC
+  };
+  const dstStart = lastSunday(y, 2); // martie
+  const dstEnd = lastSunday(y, 9); // octombrie
+  const t = date.getTime();
+  return t >= dstStart && t < dstEnd ? 3 * 3600_000 : 2 * 3600_000;
+}
+
+/**
+ * Etichetă relativă pentru interval: "acum 10 min", "acum 2 ore".
+ *
+ * Contract fake-UTC: eticheta ISO e wall-clock RO etichetat UTC, deci instanța UTC
+ * reală a înregistrării e `eticheta − offset RO`. Offset-ul exact (EET/EEST) depinde
+ * de instanță (DST), iar la tranziții aceeași etichetă poate corespunde la 2 instanțe.
+ * Candidatăm ambele offset-uri (+2h/+3h), reținem doar candidații self-consistenți
+ * (`bucharestOffsetMs(candidat) === offset aplicat`) și alegem cel mai recent candidat
+ * valid care nu e în viitor față de `now` — uniform în vară și iarnă, corect și la
+ * tranzițiile DST (înainte: erori de 1–3h pe zilele de tranziție + vârste subestimate
+ * pentru datele mai vechi de 2–3h).
+ *
+ * `now` e obligatoriu (fără default `Date.now()`) — funcția rămâne pură/deterministă
+ * (AGENTS §4.2): apelanții decid momentul de referință (UI-ul trece `Date.now()`),
+ * testele trec valori fixe.
+ */
+export function formatRelative(iso: string, now: number): string {
+  const targetMs = new Date(iso).getTime();
+
+  let resolved = targetMs;
+  const candidates: number[] = [];
+  for (const offsetMs of [2 * 3600_000, 3 * 3600_000]) {
+    const cand = targetMs - offsetMs;
+    if (bucharestOffsetMs(new Date(cand)) === offsetMs) candidates.push(cand);
+  }
+  const past = candidates.filter((c) => c <= now);
+  if (past.length > 0) resolved = Math.max(...past);
+
+  const diffMs = now - resolved;
   const min = Math.round(diffMs / 60000);
   if (min < 1) return "acum câteva secunde";
   if (min < 60) return `acum ${min} min`;

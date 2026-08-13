@@ -43,7 +43,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       glowClass: "from-red-500/10 via-transparent to-transparent",
       sub: [
         {
-          label: "Media interval",
+          label: "Media totală",
           value: stats ? formatNumber(stats.consum.avg) : "—",
         },
         {
@@ -69,7 +69,7 @@ export function KpiCards({ summary, renewableShare }: KpiCardsProps) {
       glowClass: "from-emerald-500/10 via-transparent to-transparent",
       sub: [
         {
-          label: "Media interval",
+          label: "Media totală",
           value: stats ? formatNumber(stats.productie.avg) : "—",
         },
         {

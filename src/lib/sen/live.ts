@@ -25,6 +25,7 @@
 
 import { loadReadings, loadSummary } from "./loader";
 import type { SenReading, SenSummaryResponse } from "./types";
+import { bucharestOffsetMs } from "./format";
 
 /** Endpoint-ul public Transelectrica (widget „SEN Grafic”, Liferay resource URL). */
 export const LIVE_URL =
@@ -126,25 +127,7 @@ export function mergeReadings(staticReadings: SenReading[], live: SenReading[]):
   return [...byTs.values()].sort((a, b) => a.ts - b.ts);
 }
 
-/**
- * Offset-ul UTC (ms) al orei României pentru o dată: +3h EEST (vară), +2h EET (iarnă).
- * Reguli UE: EEST începe ultima duminică din martie la 01:00 UTC și se termină
- * ultima duminică din octombrie la 01:00 UTC.
- */
-export function bucharestOffsetMs(date: Date = new Date()): number {
-  const y = date.getUTCFullYear();
-  const lastSunday = (year: number, monthIndex: number): number => {
-    // Ultima zi a lunii (luna următoare, ziua 0) la 12:00 UTC, apoi scădem
-    // ziua săptămânii până la duminică — rezultatul e în aceeași lună (monthIndex).
-    const last = new Date(Date.UTC(year, monthIndex + 1, 0, 12));
-    const back = last.getUTCDay(); // 0 = duminică
-    return Date.UTC(year, monthIndex, last.getUTCDate() - back, 1); // 01:00 UTC
-  };
-  const dstStart = lastSunday(y, 2); // martie
-  const dstEnd = lastSunday(y, 9); // octombrie
-  const t = date.getTime();
-  return t >= dstStart && t < dstEnd ? 3 * 3600_000 : 2 * 3600_000;
-}
+export { bucharestOffsetMs } from "./format";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");

@@ -6,6 +6,44 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.21] — 2026-08-13, 11:17 EEST
+
+### Reparat
+
+- **`parseRange` accepta literaluri hex/octal/binary/underscore (`src/lib/sen/aggregate.ts`)** (TO_FIX F-1): `Number("0x10") === 16`, `Number("0b101") === 5` (hex/binary acceptate de `Number()`; `Number("1_000")` e de fapt `NaN` — underscore-ul nu e un format pe care `Number()` să-l accepte) — un `?from=0x10` pe `/api/sen` sau `/api/sen/export` ar fi fost interpretat ca timestamp 16 în loc de fallback, asimetric cu `extract_ispoz`/`extractIspoz` (Python/TS resping aceste formate, doar zecimale + exponent sunt valide). Acum `parseRange` validează cu același regex zecimal (paritate cu `storage.ts`); teste de regresie adăugate (§4.14 — eșuau pe codul anterior: `parseRange("0x10", 100)` dădea 16, acum 100), iar exponentul rămâne acceptat (`1e3` → 1000).
+- **`storage.ts` importa `bucharestOffsetMs` prin re-export din `live.ts`** (TO_FIX F-3): la mutarea funcției în `format.ts` (0.3.19), `storage.ts` a rămas cu import din `./live` (care doar re-exportă) în loc de sursa reală `./format` — fragil la o viitoare curățare a re-export-ului. Fix: import direct din `./format`; re-export-ul din `live.ts` rămâne pentru testele existente. Zero schimbare de comportament.
+
+## [0.3.20] — 2026-08-13, 10:45 EEST
+
+### Reparat
+
+- **`formatRelative` cu default `now = Date.now()` ne-determinist (`src/lib/sen/format.ts`)** (claim din review): funcția își păstra un `Date.now()` ascuns ca valoare implicită, deși `bucharestOffsetMs` fusese aliniat la regula de puritate din AGENTS §4.2 (fără `Date.now()` nedeterminist). Acum parametrul `now: number` e obligatoriu — UI-ul (`header.tsx`) trece `Date.now()` explicit la afișarea badge-ului „actualizat", iar testele treceau deja valori fixe. Zero schimbare de comportament.
+
+## [0.3.19] — 2026-08-13, 09:42 EEST
+
+### Reparat
+
+- **Dezambiguizare DST în `formatRelative` (`src/lib/sen/format.ts`)** (TO_FIX): etichetele fake-UTC (wall-clock RO etichetat UTC) erau comparate cu `now` ca și cum ar fi UTC real — vârste greșite cu 1–3h pentru datele din zilele de tranziție DST (ex: o citire etichetată `01:30Z` pe 25 oct avea „acum 1 oră" în loc de „acum 4 ore") și subestimarea vârstei pentru datele mai vechi de 2–3h. Acum funcția candidează ambele offset-uri EET/EEST (+2h/+3h), reține doar candidații self-consistenți (`bucharestOffsetMs(candidat) === offset aplicat`) și alege cel mai recent candidat valid care nu e în viitor față de `now` — uniform în vară și iarnă. Adăugate **3 teste de regresie** (octombrie fall-back ×2, inclusiv ora ambiguă, + martie spring-forward) care eșuau pe codul anterior (§4.14).
+- **`parseRange` accepta whitespace-only ca 0 (`src/lib/sen/aggregate.ts`)** (TO_FIX): `Number(" ") === 0`, deci un parametru `?from=%20` pe `/api/sen/export` devenea `0` (epoch 1970) și exporta tot istoricul în loc de fallback — aceeași familie cu bug-ul NaN reparat în 0.3.18. Acum inputul e trim-muit înainte de conversie, iar whitespace-only returnează fallback-ul; aserțiune de regresie adăugată (`parseRange(" ", 100) === 100`).
+- **`bucharestOffsetMs` cu default `new Date()` ne-determinist (`src/lib/sen/format.ts`)** (TO_FIX): parametrul e acum obligatoriu (`date: Date`), aliniind funcția cu regula de puritate din AGENTS §4.2 (fără `Date.now()` ascuns). Toți consumatorii (`live.ts`, `storage.ts`, testele) treceau deja o dată explicită — zero schimbare de comportament.
+- **Gramatica numărului de teste în documentație** (TO_FIX): „135 teste" → „**138 de teste**" în `README.md` (inclusiv badge-ul de tests), `AGENTS.md` și `docs/07-testing-ci.md` (acolo era încă vechiul 131).
+
+## [0.3.18] — 2026-08-13, 07:55 EEST
+
+### Reparat
+
+- **Exportare helper `parseRange` și adăugare teste de regresie (§4.14)**: exportată funcția `parseRange` din `src/app/api/sen/export/route.ts` și `src/app/api/sen/route.ts` și adăugat suite-ul de teste unitare `parseRange` în `tests/sen/aggregate.test.ts` (verificare că `parseRange("abc", fallback)` returnează fallback-ul fără a propaga `NaN`).
+- **Sincronizare documentație suite de test**: actualizat numărul total de teste unitare la 135 în `README.md` și `AGENTS.md`.
+
+## [0.3.17] — 2026-08-13, 06:45 EEST
+
+### Reparat
+
+- **Acuratețe etichetă KPI (`kpi-cards.tsx`)**: schimbat eticheta sub-statisticii din „Media interval” în „Media totală” pe cardurile Consum și Producție pentru a reflecta exact că valoarea reprezintă media pe tot istoricul de date.
+- **Badge prospețime în Header (`format.ts`)**: adăugată compensare pentru offset-ul fusului orar al României în `formatRelative` când diferența calculată este negativă (din cauza timestamp-urilor wall-clock RO etichetate UTC), prevenind afișarea eronată „acum câteva secunde” pe date mai vechi.
+- **Validare parametru pe export (`/api/sen/export/route.ts`)**: adăugat helper `parseRange` cu `Number.isFinite` pentru sanitizarea parametrilor `from` și `to` pe ruta de export CSV.
+- **Curățenie cod și documentație**: eliminat prop-ul mort `order` de pe elementele `<Area>` din `production-mix-chart.tsx`, actualizat numărul total de teste unitare la 133 în `README.md` și `AGENTS.md`, și sincronizată versiunea din `package.json` la `0.3.17`.
+
 ## [0.3.16] — 2026-08-12, 11:55 EEST
 
 ### Reparat
@@ -89,7 +127,7 @@ Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 —
 ### Reparat
 
 - **Timestamp-ul capturilor de stocare era cu 2-3h în urmă față de eticheta `t`** (TO_FIX #6): `capture_storage` din `scripts/convert-sen.py` și snapshot-ul live din `storage.ts` calculau `ts` ca **instant-ul local real** (`now.timestamp()`), dar `t` e wall-clock România **etichetat UTC** — cele două nu se potriveau (ex: `t` zicea `18:18Z` dar `ts` corespundea lui `15:18Z`), inconsistente cu restul pipeline-ului (fake-UTC, vezi `parse_ts`/`make_record`). Acum ambele folosesc **epoch-ul UTC al valorii etichetate** (`parse_ts` în Python, `Date.parse(t)` în TS). Punctele existente din `data/sen-storage.json` au fost migrate (`ts = epoch(t)`).
-- **`extractIspoz` accepta gol/whitespace/null/array ca 0** (TO_FIX #8): `Number("") === 0`, `Number(null) === 0`, `Number([]) === 0` — un payload cu `ISPOZ: ""` (sau `null`, `[]`) era tratat ca „stocare 0 MW" în loc de invalid. Acum aceste valori sunt respinse **înainte** de `Number()`, consistent cu `extract_ispoz` din Python (care le respinge prin excepție). Bonus de paritate cu `float()`: și string-urile hex/binary/octal (`"0x10"`, `"0b101"`) sau cu underscore (`"1_000"`) — pe care `Number()` le-ar accepta — sunt respinse (regex de zecimale), ca Python.
+- **`extractIspoz` accepta gol/whitespace/null/array ca 0** (TO_FIX #8): `Number("") === 0`, `Number(null) === 0`, `Number([]) === 0` — un payload cu `ISPOZ: ""` (sau `null`, `[]`) era tratat ca „stocare 0 MW" în loc de invalid. Acum aceste valori sunt respinse **înainte** de `Number()`, consistent cu `extract_ispoz` din Python (care le respinge prin excepție). Bonus de paritate cu `float()`: și string-urile hex/binary/octal (`"0x10"`, `"0b101"`) — pe care `Number()` le-ar accepta — sau cu underscore (`"1_000"` — pe care `Number()` îl respinge oricum, dând `NaN`) sunt respinse (regex de zecimale), ca Python.
 - **`merge_storage` crăpa cu KeyError la un record cu `t` dar fără `ts`** (TO_FIX #5): `sorted(..., key=lambda x: x["ts"])` arunca pe un fișier valid JSON dar cu un record corupt. Acum record-urile fără `ts` sunt excluse la construirea seriei — toleranță la fel de strictă ca `load_existing_storage`.
 - **Badge-ul „Stocare" arăta „ultima captură" când nu exista nicio valoare** (TO_FIX #7): cu `current === null` (fără istoric ȘI fără live), badge-ul afișa „ultima captură" — fals. Acum afișează „se încarcă" în timpul loading-ului și „nicio captură" pentru no-data; „live" doar pentru `source === "live"`.
 - **Push-ul workflow-urilor putea pierde un commit la respingere non-fast-forward** (TO_FIX #1): `storage-capture.yml` și `data-refresh.yml` făceau un singur `git push` după rebase — dacă celălalt workflow împingea între rebase și push, captura/ziua se pierdea. Acum push-ul are **retry (3 încercări)**: la respingere reface rebase pe remote și reîncearcă; auto-heal doar după epuizarea încercărilor sau la rebase eșuat.

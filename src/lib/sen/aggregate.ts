@@ -180,6 +180,24 @@ export function filterByRange(readings: SenReading[], from?: number, to?: number
 }
 
 /**
+ * Convertește un parametru de query string (`from`/`to`) în număr finit.
+ * Dacă parametrul este invalid (ex: `NaN`, `abc`, whitespace-only, hex/octal/
+ * binary/underscore) sau lipsește, returnează fallback-ul. Fără trim,
+ * `Number(" ") === 0` ar produce o limită epoch (1970) în loc de fallback;
+ * iar `Number("0x10") === 16` ar accepta literaluri hex — aceeași familie.
+ * Regex-ul e identic cu `extractIspoz`/`float()` din Python (paritate): doar
+ * zecimale (+ exponent) sunt valide.
+ */
+export function parseRange(v: string | null, fallback?: number): number | undefined {
+  if (!v) return fallback;
+  const trimmed = v.trim();
+  if (!trimmed) return fallback;
+  if (!/^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(trimmed)) return fallback;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
  * Limitează numărul de puncte la `maxPoints` prin sub-eșantionare uniformă
  * (păstrează primul și ultimul). Folosit pentru a proteja frontend-ul când
  * intervalul selectat e foarte mare la granularitate raw.

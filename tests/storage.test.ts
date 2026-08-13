@@ -44,7 +44,7 @@ describe("extractIspoz", () => {
     expect(extractIspoz([{ ISPOZ: [] }])).toBeNull();
     expect(extractIspoz([{ ISPOZ: undefined }])).toBeNull();
     // Paritate cu float() din Python: hex/binary/octal/underscore respinse
-    // (Number() le-ar accepta: 0x10=16, 0b101=5, 1_000=1000).
+    // (Number() le-ar accepta: 0x10=16, 0b101=5, 0o17=15; 1_000 → NaN).
     expect(extractIspoz([{ ISPOZ: "0x10" }])).toBeNull();
     expect(extractIspoz([{ ISPOZ: "0b101" }])).toBeNull();
     expect(extractIspoz([{ ISPOZ: "1_000" }])).toBeNull();

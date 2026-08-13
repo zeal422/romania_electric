@@ -122,26 +122,60 @@ describe("formatTime", () => {
 });
 
 describe("formatRelative", () => {
+  // Contract fake-UTC: eticheta ISO e wall-clock RO etichetat UTC. În vară (EEST),
+  // instanța UTC reală a lui "2026-08-08T10:00:00.000Z" e 07:00 UTC — deci baza de
+  // referință pentru bucket-uri e eticheta − 3h (candidatul self-consistent).
   const iso = "2026-08-08T10:00:00.000Z";
+  const resolved = Date.parse(iso) - 3 * 3600_000; // 07:00 UTC
 
   it("returns 'acum câteva secunde' under a minute", () => {
     // 10s rotunjit = 0 min; la 30s funcția dă deja „acum 1 min" (Math.round) — comportament intenționat.
-    expect(formatRelative(iso, Date.parse(iso) + 10_000)).toBe("acum câteva secunde");
-    expect(formatRelative(iso, Date.parse(iso) + 30_000)).toBe("acum 1 min");
+    expect(formatRelative(iso, resolved + 10_000)).toBe("acum câteva secunde");
+    expect(formatRelative(iso, resolved + 30_000)).toBe("acum 1 min");
   });
 
   it("returns minutes", () => {
-    expect(formatRelative(iso, Date.parse(iso) + 10 * 60_000)).toBe("acum 10 min");
+    expect(formatRelative(iso, resolved + 10 * 60_000)).toBe("acum 10 min");
   });
 
   it("returns singular and plural hours", () => {
-    expect(formatRelative(iso, Date.parse(iso) + 60 * 60_000)).toBe("acum 1 oră");
-    expect(formatRelative(iso, Date.parse(iso) + 3 * 60 * 60_000)).toBe("acum 3 ore");
+    expect(formatRelative(iso, resolved + 60 * 60_000)).toBe("acum 1 oră");
+    expect(formatRelative(iso, resolved + 3 * 60 * 60_000)).toBe("acum 3 ore");
   });
 
   it("returns singular and plural days", () => {
-    expect(formatRelative(iso, Date.parse(iso) + 24 * 60 * 60_000)).toBe("acum 1 zi");
-    expect(formatRelative(iso, Date.parse(iso) + 5 * 24 * 60 * 60_000)).toBe("acum 5 zile");
+    expect(formatRelative(iso, resolved + 24 * 60 * 60_000)).toBe("acum 1 zi");
+    expect(formatRelative(iso, resolved + 5 * 24 * 60 * 60_000)).toBe("acum 5 zile");
+  });
+
+  it("resolves fake-UTC Bucharest wall-clock timestamps to the real instant", () => {
+    // În vară, ora 10:00 locală RO e etichetată 10:00Z. Timpul real UTC e 07:00Z.
+    // La 07:05:00 UTC (ora 10:05 locală), vârsta reală e 5 min.
+    expect(formatRelative(iso, Date.UTC(2026, 7, 8, 7, 5, 0))).toBe("acum 5 min");
+  });
+
+  it("resolves October DST fall-back timestamps to the real instant (off by 1h on old code)", () => {
+    // 25 oct 2026: DST se termină la 01:00 UTC. Eticheta 01:30Z = wall-clock 01:30 RO
+    // în EEST → instanța reală 22:30 UTC (24 oct). La now 02:30 UTC, vârsta e 4h.
+    expect(formatRelative("2026-10-25T01:30:00.000Z", Date.parse("2026-10-25T02:30:00.000Z"))).toBe(
+      "acum 4 ore",
+    );
+  });
+
+  it("resolves the ambiguous fall-back hour to the latest instant not after now", () => {
+    // Eticheta 03:30Z pe 25 oct corespunde la 2 instanțe (03:30 EEST = 00:30 UTC;
+    // 03:30 EET = 01:30 UTC). La now 01:00:30 UTC doar prima e în trecut → 30.5 min.
+    expect(formatRelative("2026-10-25T03:30:00.000Z", Date.parse("2026-10-25T01:00:30.000Z"))).toBe(
+      "acum 31 min",
+    );
+  });
+
+  it("resolves March DST spring-forward timestamps to the real instant", () => {
+    // 29 mar 2026: DST începe la 01:00 UTC. Eticheta 01:30Z = wall-clock 01:30 RO
+    // în EET → instanța reală 23:30 UTC (28 mar). La now 02:30 UTC, vârsta e 3h.
+    expect(formatRelative("2026-03-29T01:30:00.000Z", Date.parse("2026-03-29T02:30:00.000Z"))).toBe(
+      "acum 3 ore",
+    );
   });
 });
 

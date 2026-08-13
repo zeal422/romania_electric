@@ -18,7 +18,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { bucharestOffsetMs } from "./live";
+import { bucharestOffsetMs } from "./format"; // sursa reală; live.ts doar re-exportă (0.3.19)
 import type { StorageApiResponse, StorageCurrent, StoragePoint } from "./types";
 
 /** Snapshot-ul curent public de la Transelectrica (lista de coduri SEN → MW). */
@@ -93,8 +93,9 @@ export function extractIspoz(payload: unknown): number | null {
       if (Array.isArray(raw)) return null;
       if (typeof raw === "string") {
         // Paritate cu float() din Python: respinge hex/binary/octal ("0x10",
-        // "0b101", "0o17") și underscore ("1_000") pe care Number() le-ar
-        // accepta — doar zecimale (+ exponent) sunt valide.
+        // "0b101", "0o17" — pe care Number() le-ar accepta: 16/5/15) și
+        // underscore ("1_000" — pe care Number() îl respinge oricum: NaN) —
+        // doar zecimale (+ exponent) sunt valide.
         const trimmed = raw.trim();
         if (trimmed === "") return null;
         if (!/^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(trimmed)) return null;

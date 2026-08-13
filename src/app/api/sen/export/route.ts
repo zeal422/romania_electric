@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { filterByRange } from "@/lib/sen/aggregate";
+import { filterByRange, parseRange } from "@/lib/sen/aggregate";
 import { getLiveReadings, getLiveSummary } from "@/lib/sen/live";
 
 export const dynamic = "force-dynamic";
@@ -50,10 +50,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const readings = await getLiveReadings();
   const summary = await getLiveSummary();
-  const from = url.searchParams.get("from")
-    ? Number(url.searchParams.get("from"))
-    : summary.startTs;
-  const to = url.searchParams.get("to") ? Number(url.searchParams.get("to")) : summary.endTs;
+  const from = parseRange(url.searchParams.get("from"), summary.startTs);
+  const to = parseRange(url.searchParams.get("to"), summary.endTs);
 
   const filtered = filterByRange(readings, from, to);
 

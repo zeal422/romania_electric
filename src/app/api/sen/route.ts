@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { aggregate, downsample, filterByRange } from "@/lib/sen/aggregate";
+import { aggregate, downsample, filterByRange, parseRange } from "@/lib/sen/aggregate";
 import { fieldStats, renewableShare } from "@/lib/sen/stats";
 import type { Granularity, SenApiResponse } from "@/lib/sen/types";
 import { getLiveReadings, getLiveSummary } from "@/lib/sen/live";
@@ -13,12 +13,6 @@ const MAX_POINTS = 1200;
 function parseGranularity(v: string | null): Granularity {
   if (v === "raw" || v === "10m" || v === "hour" || v === "day") return v;
   return "hour";
-}
-
-function parseRange(v: string | null, fallback?: number): number | undefined {
-  if (!v) return fallback;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
 }
 
 /**

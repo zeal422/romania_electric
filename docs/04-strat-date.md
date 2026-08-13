@@ -10,7 +10,7 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`types.ts`](../src/lib/sen/types.ts)         | Tipuri TypeScript: `SenReading`, `SenField`, `SourceField`, `Granularity`, `AggregatedPoint`, `FieldStats`, `SenApiResponse`, `SenSummaryResponse`, `StoragePoint`, `StorageApiResponse` |
 | [`constants.ts`](../src/lib/sen/constants.ts) | Metadate surse: etichete RO, culori semantice, ordine de afișare, clasificare fosil/regenerabil + `STORAGE_COLOR` (accentul stocării ISPOZ)                                              |
-| [`aggregate.ts`](../src/lib/sen/aggregate.ts) | `mean`, `bucketKey`, `aggregate`, `filterByRange`, `downsample`                                                                                                                          |
+| [`aggregate.ts`](../src/lib/sen/aggregate.ts) | `mean`, `bucketKey`, `aggregate`, `filterByRange`, `downsample`, `parseRange`                                                                                                            |
 | [`stats.ts`](../src/lib/sen/stats.ts)         | `fieldStats`, `renewableShare`, `sourceShares`, `balanceStats`, `latestReading`                                                                                                          |
 | [`format.ts`](../src/lib/sen/format.ts)       | Formatare `Intl` ro-RO: numere, MW, sold, procente, date, ore                                                                                                                            |
 | [`loader.ts`](../src/lib/sen/loader.ts)       | Citire `data/*.json` — **server-only**, cache singleton (excepția de la „pur")                                                                                                           |
@@ -46,6 +46,7 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 - **`aggregate(readings, granularity)`** — grupează, calculează **media** fiecărui câmp numeric per bucket, rotunjește la 1 zecimală (`r1`), sortează crescător. La `raw` întoarce fiecare înregistrare ca punct (cu `count: 1`).
 - **`filterByRange(readings, from?, to?)`** — filtrează inclusiv pe `ts`; capete `undefined` = nu filtrează.
 - **`downsample(items, maxPoints)`** — sub-eșantionare uniformă (păstrează primul și ultimul element).
+- **`parseRange(v, fallback?)`** — convertește parametrul `from`/`to` din query string în număr finit; input invalid, `NaN`, gol, **whitespace-only** (`Number(" ") === 0`) sau literaluri **hex/octal/binary** (`0x10`, `0b101` — pe care `Number()` le-ar accepta: 16, 5) sau **underscore** (`1_000` — pe care `Number()` îl respinge oricum, dând `NaN`) → fallback (sanitizarea rutelor API/export). Regex zecimal identic cu `extractIspoz`/`float()` din Python (paritate): doar zecimale + exponent (`1e3`) sunt valide.
 
 Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci.md](./07-testing-ci.md)).
 
@@ -66,7 +67,7 @@ Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci
 - `formatPercent(v, decimals?)`, `mwToGwh(mw, hours)`.
 - `formatDateTime(iso, {withYear?})` → `"8 aug, 18:07"`; `formatDate` → `"8 aug 2026"`; `formatTime` → `"18:07"`.
 - `formatAxisTick(ts, granularity)` → label de axă X pentru grafice (UTC): `"8 aug"` la `day`/`hour`, `"18:07"` la `raw`/`10m` — sursa unică pentru axele Recharts (folosit de `ProductionMixChart`, `DemandSupplyChart`, `BalanceChart`).
-- `formatRelative(iso, now?)` → `"acum 10 min"`, `"acum 2 ore"`.
+- `formatRelative(iso, now)` → `"acum 10 min"`, `"acum 2 ore"` — `now` e obligatoriu (fără default `Date.now()`, puritate §4.2); rezolvă instanța UTC reală a etichetei fake-UTC prin candidați `−2h`/`−3h` self-consistenți (`bucharestOffsetMs(candidat) === offset aplicat`), alegând cel mai recent candidat valid ≤ `now` — corect și la tranzițiile DST (fix 0.3.19).
 - `formatLastUpdatedLabel(relative)` → eticheta de accesibilitate a badge-ului „ultima înregistrare" din Header: `"Ultima înregistrare, actualizată …"` (acord feminin).
 - `granularityLabel(g)` → eticheta RO a unei granularități.
 

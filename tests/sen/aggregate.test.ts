@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { aggregate, bucketKey, downsample, filterByRange, mean } from "@/lib/sen/aggregate";
+import {
+  aggregate,
+  bucketKey,
+  downsample,
+  filterByRange,
+  mean,
+  parseRange,
+} from "@/lib/sen/aggregate";
 import type { Granularity, SenReading } from "@/lib/sen/types";
 
 /** Helper: creează o înregistrare SenReading sintetică pentru teste. */
@@ -219,5 +226,34 @@ describe("aggregate granularity parity", () => {
       expect(p).toHaveProperty("count");
       expect(typeof p.consum).toBe("number");
     }
+  });
+});
+
+describe("parseRange (sanitizare parametri range API)", () => {
+  it("returns parsed number for valid finite numeric strings", () => {
+    expect(parseRange("1700000000", 100)).toBe(1700000000);
+  });
+
+  it("returns fallback for null, empty, whitespace-only or invalid non-numeric strings (prevenire NaN)", () => {
+    expect(parseRange(null, 100)).toBe(100);
+    expect(parseRange("", 100)).toBe(100);
+    expect(parseRange(" ", 100)).toBe(100); // Number(' ') === 0 — trebuie fallback, nu 0 (epoch 1970)
+    expect(parseRange("abc", 100)).toBe(100);
+    expect(parseRange("NaN", 100)).toBe(100);
+  });
+
+  it("rejects hex/octal/binary/underscore literals that Number() would accept (paritate Python)", () => {
+    // Number('0x10') === 16, Number('0b101') === 5, Number('0o17') === 15 —
+    // iar Number('1_000') dă NaN (underscore-ul nu e acceptat de Number()) —
+    // dar float() din Python respinge toate aceste formate; parseRange trebuie
+    // să accepte DOAR zecimale (+ exponent), ca extract_ispoz/extractIspoz.
+    expect(parseRange("0x10", 100)).toBe(100);
+    expect(parseRange("0b101", 100)).toBe(100);
+    expect(parseRange("1_000", 100)).toBe(100);
+  });
+
+  it("accepts decimal and exponent notation (ca float() din Python)", () => {
+    expect(parseRange("1700000000", 100)).toBe(1700000000);
+    expect(parseRange("1e3", 100)).toBe(1000); // exponent valid, ca float('1e3')
   });
 });
