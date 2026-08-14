@@ -6,6 +6,25 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.25] — 2026-08-14, 06:40 EEST
+
+### Adăugat
+
+- **Legenda `SourceDistribution` afișează mereu toate cele 7 surse** (`src/lib/sen/constants.ts` + `src/components/dashboard/source-distribution.tsx`): funcție pură nouă `buildLegendRows(latest?)` care derivează toate sursele din `SOURCE_ORDER` cu `label`/`color`/`hint` din `SOURCES` + `value` și `isZero` (`value <= 0`). Vechiul `.filter(d => d.value > 0)` scotea din legendă orice sursă la 0 MW (ex: foto noaptea, nuclear la oprire) — utilizatorul vedea un donut cu 6 felii și un rând lipsă, fără indicație că a 7-a sursă există.
+- **Zero-state în legendă**: sursele la 0 apar cu cerc gol (○, `border-border/40`), `opacity-50`, valoare `0`, procent `—` (în loc de `0,0%`) și tooltip `title={hint}` la hover. Donut-ul rămâne neschimbat (filtrează `> 0`); empty-state-ul „Nicio înregistrare” rămâne pe `!latest`.
+
+### Testat
+
+- **5 teste noi** în `tests/sen/source-distribution.test.ts` (regula 4.14): 7 rânduri mereu chiar cu o sursă la 0 (vechiul cod dădea 6), `isZero` la 0 MW vs când produce, `undefined` → 7 rânduri zero, ordinea `SOURCE_ORDER` păstrată, `label`/`color`/`hint` din `SOURCES`. Total: **174 → 179 teste** (9 fișiere), verzi în ambele fusuri.
+
+### Documentat
+
+- `docs/05` (zero-state în descrierea `SourceDistribution`), `docs/04` + `docs/06` (`buildLegendRows` documentată), `docs/07` (rând nou în tabel + count), README/AGENTS (count teste 179).
+
+### Reparat
+
+- **Fixuri TO_FIX (validate pe cod, 4/5)**: rândurile de legendă la zero devin elemente noninteractive (`<div>`, non-focusabile, fără hover-store) — non-zero rămân `<button>` cu `onFocus`/`onBlur` (a11y: un buton focusabil fără acțiune e anunțat greșit de screen-reader); `ts`-ul fixture-ului din `source-distribution.test.ts` corectat la `1_786_708_800_000` ca să corespundă cu `t` (`2026-08-14T12:00:00.000Z`, era decalat 29,5 zile); manifest extins cu `tests/sen/source-distribution.test.ts`; `docs/07` corectat „tests/sen/ (5 fișiere)” → „(6 fișiere)”. Claim-ul 3 (mutarea copy-ului „Nicio înregistrare” într-o locație shared) respins — nu există locație shared de copy în proiect, ar fi over-engineering.
+
 ## [0.3.24] — 2026-08-13, 17:02 EEST
 
 ### Reparat

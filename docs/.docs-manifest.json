@@ -10,7 +10,7 @@
       "src/lib/sen/index.ts": "a03967937faa152f560833300469defbba70b957ca5e4a80e7d27f3f2f3f4e12",
       "src/lib/utils.ts": "d1f1e0d62cb8d8d1e04c26e14de842d8a151f75812d81b046c65b5d1fe8e4b27",
       "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
-      "package.json": "a8cb564c9a9be5dbf26b9694795948933608412b788dbd9dbdc7163c9072b21a",
+      "package.json": "59078ad616bdc379f243bc75665b6df2aad9d9c85675c0ac6ad5fbbca732e560",
       "src/lib/sen/live.ts": "d5cd888b018f0320ccff2aa3335c61c98d316a0b7256b1a8e6620395827c5278",
       "src/lib/sen/storage.ts": "677aa7416d1ead33bf9f31aed38e440e30c76f2d63225bbc3aa76508d713e38a",
       "src/components/dashboard/storage-card.tsx": "f5d493851ff90bcaa6edaf7a28977dfa1c78bcf70b9a00b6453655445ca3955c",
@@ -46,7 +46,7 @@
   "docs/04-strat-date.md": {
     "covers": {
       "src/lib/sen/types.ts": "e03722bbe534e0b0f8d772bdd22a13446f8eb78b4b8093462fe7a16d376626eb",
-      "src/lib/sen/constants.ts": "97a20bdddb557f0bca53d8ea0aaa705e4670e697f27dc416a541e007127f9d06",
+      "src/lib/sen/constants.ts": "967a4cb19d60bcc42e4f91b8ca59f7959d64569042ab507489e487f39dcc497e",
       "src/lib/sen/aggregate.ts": "0b0d16059cfab23a0329ab287053606a810a16cf4c2e7ebb59cf42f44858603e",
       "src/lib/sen/stats.ts": "54946e4b52b8c19bd6a4ee871abea6fcd08dc90a118d5bf2d1975021405dedb0",
       "src/lib/sen/format.ts": "1fb3736f5089424a5bb8adaa556b19f942d2b5aa92a1425b31a3daa8c5ab2848",
@@ -65,7 +65,7 @@
       "src/components/dashboard/filters.tsx": "00fe60b92f3aa5c7f210a4e804f049814f4bdf8f1867acbca1d989ea14ba126d",
       "src/components/dashboard/kpi-cards.tsx": "e9de308f9c6a3c9c0440d8a66fe0ae8aa8dbe1da3cbdca89e674c23afe5f63a8",
       "src/components/dashboard/production-mix-chart.tsx": "312d55219ac7740e26bc5ea6cbeb52c47e34c113a4112252525b408f104c415d",
-      "src/components/dashboard/source-distribution.tsx": "037493dca6c8318eea9ee16d1257dbbfbf920d1264a1979e7d448773de82ec92",
+      "src/components/dashboard/source-distribution.tsx": "285b2b8706ed918014dee5c5bf2a394f31477a7a5b2b6501b7535ac6be856771",
       "src/components/dashboard/demand-supply-chart.tsx": "da866701e022c19494865b259685be683309e805c9d2e30f5bb7bf1c118e8174",
       "src/components/dashboard/balance-chart.tsx": "a92dae1c4b0ea42165929bc229be10b71f2a1789c990599a9c525af4ca13919a",
       "src/components/dashboard/data-table.tsx": "9e4f597338a5bcb7a2bdb6f34b7eee2680d1afb3380d29d5d27174b9213b81bb",
@@ -88,13 +88,13 @@
     "covers": {
       "src/app/globals.css": "f7b1dacc57f4cc7fb5bd41e4e1e94924236b0f803be94c049415068045dd2b06",
       "tailwind.config.ts": "ade682235e52f45b1c1dfc020f0bdb9f27b94fcff60afaa3272fae22fe5c0c54",
-      "src/lib/sen/constants.ts": "97a20bdddb557f0bca53d8ea0aaa705e4670e697f27dc416a541e007127f9d06",
+      "src/lib/sen/constants.ts": "967a4cb19d60bcc42e4f91b8ca59f7959d64569042ab507489e487f39dcc497e",
       "src/app/layout.tsx": "e9847fb7f663ae3cf8ee66bd856dddefa0db7cf2d197739887d3c26dfcafbc97"
     }
   },
   "docs/07-testing-ci.md": {
     "covers": {
-      "package.json": "a8cb564c9a9be5dbf26b9694795948933608412b788dbd9dbdc7163c9072b21a",
+      "package.json": "59078ad616bdc379f243bc75665b6df2aad9d9c85675c0ac6ad5fbbca732e560",
       "scripts/check-hydration.sh": "4cd8ec4a837765ccf3ebf69d7773a675c2a10c4f144c844ec1f0f12b18bb40c1",
       "scripts/check-docs-stale.sh": "3bbb52e1c2392c29406f32f875f32d291c2132f0da349259a67fa337e2deaca2",
       "scripts/mark-docs-verified.sh": "b2ad1538c3c69627ce8d3612fc51f678d45367d55ccddf76193f4a816ad7973f",
@@ -105,7 +105,8 @@
       "tests/local-preference.test.ts": "3786986f262c9c293cf6a0fdcae4271e768811eb947b2886111bca8a05237689",
       "tests/storage.test.ts": "3740a9b2234a64be966de2065e1ca653b047f4ec76459d8a4372adadadca9b8c",
       "tests/capture-storage.test.ts": "d9b5ae6c27371a5b5d5e1b8c129666af7ab739d5d21fe54860fd7a856d62ed27",
-      "tests/sen/instant.test.ts": "8c2ade3aaafccfb6e892742677598c61cfb772d60fcf1f3e3e0f5a18b0b771ca"
+      "tests/sen/instant.test.ts": "8c2ade3aaafccfb6e892742677598c61cfb772d60fcf1f3e3e0f5a18b0b771ca",
+      "tests/sen/source-distribution.test.ts": "6b93473462b8a67033b00d133473d59562ee457913dcb0c4dc31623c0864023e"
     }
   },
   "docs/08-harta-cautare.md": {
@@ -117,7 +118,7 @@
       "src/components/dashboard/filters.tsx": "00fe60b92f3aa5c7f210a4e804f049814f4bdf8f1867acbca1d989ea14ba126d",
       "src/components/dashboard/kpi-cards.tsx": "e9de308f9c6a3c9c0440d8a66fe0ae8aa8dbe1da3cbdca89e674c23afe5f63a8",
       "src/components/dashboard/production-mix-chart.tsx": "312d55219ac7740e26bc5ea6cbeb52c47e34c113a4112252525b408f104c415d",
-      "src/components/dashboard/source-distribution.tsx": "037493dca6c8318eea9ee16d1257dbbfbf920d1264a1979e7d448773de82ec92",
+      "src/components/dashboard/source-distribution.tsx": "285b2b8706ed918014dee5c5bf2a394f31477a7a5b2b6501b7535ac6be856771",
       "src/components/dashboard/demand-supply-chart.tsx": "da866701e022c19494865b259685be683309e805c9d2e30f5bb7bf1c118e8174",
       "src/components/dashboard/balance-chart.tsx": "a92dae1c4b0ea42165929bc229be10b71f2a1789c990599a9c525af4ca13919a",
       "src/components/dashboard/data-table.tsx": "9e4f597338a5bcb7a2bdb6f34b7eee2680d1afb3380d29d5d27174b9213b81bb",
@@ -130,7 +131,7 @@
       "src/hooks/use-local-preference.ts": "6d998f2a4e0e5b114731f56cc1be225db18f86a477959dec0eef5451e8247634",
       "src/lib/local-preference.ts": "5a366f1a420f15264ff9dfeeb6619a0492e74d63e020cac0e4c39bde85e1a75c",
       "src/lib/sen/types.ts": "e03722bbe534e0b0f8d772bdd22a13446f8eb78b4b8093462fe7a16d376626eb",
-      "src/lib/sen/constants.ts": "97a20bdddb557f0bca53d8ea0aaa705e4670e697f27dc416a541e007127f9d06",
+      "src/lib/sen/constants.ts": "967a4cb19d60bcc42e4f91b8ca59f7959d64569042ab507489e487f39dcc497e",
       "src/lib/sen/aggregate.ts": "0b0d16059cfab23a0329ab287053606a810a16cf4c2e7ebb59cf42f44858603e",
       "src/lib/sen/stats.ts": "54946e4b52b8c19bd6a4ee871abea6fcd08dc90a118d5bf2d1975021405dedb0",
       "src/lib/sen/format.ts": "1fb3736f5089424a5bb8adaa556b19f942d2b5aa92a1425b31a3daa8c5ab2848",
@@ -147,7 +148,7 @@
       "tests/sen/aggregate.test.ts": "8b6307193e2335b7e0e7b1e8018fd363b2bf15d05c2ea137c82ddaa3a5db0d3b",
       "tests/sen/stats.test.ts": "eb65d371a261cb14dd3b5e77df77c54a9928f2c8571315644a31ad43439a768e",
       "tests/sen/format.test.ts": "0c2de50ed1cbafd9b4c9fbcaa6bb33edc266501460d304bbed779c2e0a34b1cc",
-      "package.json": "a8cb564c9a9be5dbf26b9694795948933608412b788dbd9dbdc7163c9072b21a",
+      "package.json": "59078ad616bdc379f243bc75665b6df2aad9d9c85675c0ac6ad5fbbca732e560",
       "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
       "src/lib/sen/live.ts": "d5cd888b018f0320ccff2aa3335c61c98d316a0b7256b1a8e6620395827c5278",
       "tests/sen/live.test.ts": "f4b6676466f5e45463751ab116f49be11005e15cffead0aa36b9aca7f95a3bf1",

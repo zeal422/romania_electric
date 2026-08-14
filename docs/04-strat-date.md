@@ -48,6 +48,7 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 - **`aggregate(readings, granularity)`** — grupează, calculează **media** fiecărui câmp numeric per bucket, rotunjește la 1 zecimală (`r1`), sortează crescător. La `raw` întoarce fiecare înregistrare ca punct (cu `count: 1`).
 - **`filterByRange(readings, from?, to?)`** — filtrează inclusiv pe `ts`; capete `undefined` = nu filtrează.
 - **`downsample(items, maxPoints)`** — sub-eșantionare uniformă (păstrează primul și ultimul element).
+- **`buildLegendRows(latest?)`** (`constants.ts`) — derivă toate cele 7 surse din `SOURCE_ORDER` cu `label`/`color`/`hint` din `SOURCES` + `value` și `isZero` (`value <= 0`). Niciodată filtrat: sursele la 0 rămân în legendă cu zero-state (folosită de `SourceDistribution`). Pură, testabilă fără RTL.
 - **`parseRange(v, fallback?)`** — convertește parametrul `from`/`to` din query string în număr finit; input invalid, `NaN`, gol, **whitespace-only** (`Number(" ") === 0`) sau literaluri **hex/octal/binary** (`0x10`, `0b101` — pe care `Number()` le-ar accepta: 16, 5) sau **underscore** (`1_000` — pe care `Number()` îl respinge oricum, dând `NaN`) → fallback (sanitizarea rutelor API/export). Regex zecimal identic cu `extractIspoz`/`float()` din Python (paritate): doar zecimale + exponent (`1e3`) sunt valide.
 
 Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci.md](./07-testing-ci.md)).

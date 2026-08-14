@@ -56,6 +56,8 @@ Serii non-sursă (`SERIES_COLORS`): `consum` roșu `#dc2626`, `productie` emeral
 
 > **Schimbă culorile DOAR în `constants.ts`.** Componentele citesc `SOURCES[f].color` / `SOURCES[f].fill` — nu le duplica în JSX.
 
+`buildLegendRows(latest?)` (tot în `constants.ts`) derivă rândurile de legendă pentru donut: toate cele 7 surse din `SOURCE_ORDER`, cu `isZero: true` când `value <= 0` — sursele la 0 nu dispar din legendă, primesc zero-state (cerc gol ○, `opacity-50`, procent `—`).
+
 ## Tipografie
 
 - Fonturi Next.js: **Geist Sans** (`--font-geist-sans`) + **Geist Mono** (`--font-geist-mono`), expuse ca `--font-sans`/`--font-mono`.

@@ -1,4 +1,4 @@
-import type { SourceField } from "./types";
+import type { SenReading, SourceField } from "./types";
 
 /**
  * Metadate pentru sursele de producție: etichete românești, culori semantice
@@ -107,6 +107,37 @@ export const RENEWABLE_FIELDS: SourceField[] = ["ape", "eolian", "foto", "biomas
 
 /** Câmpuri considerate fosile (cărbune + hidrocarburi). */
 export const FOSSIL_FIELDS: SourceField[] = ["carbune", "hidrocarburi"];
+
+export interface LegendRow {
+  field: SourceField;
+  label: string;
+  color: string;
+  hint: string;
+  value: number;
+  /** `true` când sursa e la 0 MW (sau sub) — rândul de legendă primește zero-state. */
+  isZero: boolean;
+}
+
+/**
+ * Toate cele 7 surse din `SOURCE_ORDER`, mereu (niciodată filtrat) — pentru
+ * legenda de sub donut: sursele la `value <= 0` rămân vizibile cu `isZero: true`
+ * (cerc gol, `opacity-50`, procent `—`), ca utilizatorul să știe că sursa există
+ * chiar dacă acum nu produce. Pură și deterministă (regula 4.14 din AGENTS.md),
+ * testabilă direct cu `bun:test` fără RTL.
+ */
+export function buildLegendRows(latest: SenReading | undefined): LegendRow[] {
+  return SOURCE_ORDER.map((f) => {
+    const value = latest ? latest[f] : 0;
+    return {
+      field: f,
+      label: SOURCES[f].label,
+      color: SOURCES[f].color,
+      hint: SOURCES[f].hint,
+      value,
+      isZero: value <= 0,
+    };
+  });
+}
 
 /** Culori pentru serii non-sursă (consum, producție, sold). */
 export const SERIES_COLORS = {
