@@ -72,6 +72,16 @@ describe("parseInstantTimestamp (format YY/MM/DD HH:MM:SS)", () => {
     expect(parseInstantTimestamp("26/8/5 09:05:00")!.t).toBe("2026-08-05T09:05:00.000Z");
   });
 
+  it("accepts single-digit hour (real payload: '26/8/15 8:10:33')", () => {
+    // Transelectrica NU face zero-padding la oră când e < 10 — payload real
+    // capturat 15 aug 2026: "26/8/15 8:10:33". Fără această toleranță,
+    // getInstantData → null și soldul pare „blocat” (fallback pe seria istorică).
+    const r = parseInstantTimestamp("26/8/15 8:10:33");
+    expect(r).not.toBeNull();
+    expect(r!.t).toBe("2026-08-15T08:10:33.000Z");
+    expect(r!.ts).toBe(Date.UTC(2026, 7, 15, 8, 10, 33));
+  });
+
   it("rejects invalid formats and out-of-range components (no silent Date.UTC normalization)", () => {
     expect(parseInstantTimestamp("")).toBeNull();
     expect(parseInstantTimestamp("garbage")).toBeNull();

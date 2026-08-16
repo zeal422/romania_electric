@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import {
   Area,
-  AreaChart,
   CartesianGrid,
+  ComposedChart,
+  LabelList,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -44,7 +45,11 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={points} margin={MARGIN}>
+      {/* ComposedChart, NU AreaChart: în recharts 2.15 `<Line>` nu se randează
+          deloc în interiorul unui AreaChart (bug preexistent — linia de consum
+          lipsea deși subtitlul o promitea), dar merge în ComposedChart, care
+          există exact pentru a combina arii stivuite + linii. */}
+      <ComposedChart data={points} margin={MARGIN}>
         <defs>
           {SOURCE_ORDER.map((f) => (
             <linearGradient key={f} id={`grad-${f}`} x1="0" y1="0" x2="0" y2="1">
@@ -104,8 +109,35 @@ export function ProductionMixChart({ points, granularity }: ProductionMixChartPr
           strokeDasharray="5 3"
           dot={false}
           isAnimationActive={false}
-        />
-      </AreaChart>
+        >
+          {/* Eticheta „Consum” lângă ultimul punct al liniei: LabelList TREBUIE
+              să fie COPIL al Line (renderCallByParent îl caută în children-ul
+              liniei), cu content custom care randează textul DOAR pe ultimul
+              punct (index-ul maxim). Se calculează client-side — în SSR nu
+              apare, dar în browser da. */}
+          <LabelList
+            dataKey="consum"
+            position="right"
+            content={(props) => {
+              const { x, y, index } = props as { x?: number; y?: number; index?: number };
+              if (index === undefined || x === undefined || y === undefined) return null;
+              if (index !== points.length - 1) return null;
+              return (
+                <text
+                  x={x + 6}
+                  y={y - 4}
+                  fill={SERIES_COLORS.consum}
+                  fontSize={10}
+                  fontWeight={600}
+                  className="select-none"
+                >
+                  Consum
+                </text>
+              );
+            }}
+          />
+        </Line>
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }

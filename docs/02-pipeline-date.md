@@ -33,6 +33,18 @@ src/lib/sen/storage.ts ← încarcă seria + fetch snapshot live (TTL 3 min, fal
         ▼
 API route (/api/sen/storage)
 
+Prețuri PZU (day-ahead) — capturate de noi de la OPCOM (export CSV public):
+export CSV OPCOM (opcom.ro/rapoarte-pzu-raportPIP-export-csv/{DD}/{MM}/{YYYY}/en?resolution=60)
+        │  scripts/convert-sen.py --capture-prices  (workflow price-capture, cron zilnic)
+        ▼
+data/sen-prices.json  ← zile cu prețuri orare [{date, prices[24], currency: "EUR"}]
+        │
+src/lib/sen/prices.ts ← încarcă seria capturată (cache singleton)
+src/lib/sen/costs.ts  ← funcții pure: cost = Σ (MWh × preț orar)
+        │
+        ▼
+API route (/api/sen/costs)
+
 Valori real-time (Consum/Producție/Sold + mix pe surse):
 snapshot /sen-filter (coduri SEN → valori, același endpoint ca stocarea)
         │  src/lib/sen/instant.ts (server-only, TTL 10s + backoff 30s)
@@ -144,6 +156,29 @@ Structura corespunde tipului [`SenSummaryResponse`](../src/lib/sen/types.ts).
 
 > **Nu modifica manual `data/sen-storage.json`** — e generat de `--capture-storage` (aceeași regulă ca `sen-data.json`).
 
+## 6b. Prețurile PZU (day-ahead): `--capture-prices` + `prices.ts` + `costs.ts`
+
+**Context**: OPCOM publică prețurile orare PZU (day-ahead, EUR/MWh) ca **export CSV public** — fără cheie, fără înregistrare (la fel cum Transelectrica expune widget-ul SEN). Endpoint: `https://www.opcom.ro/rapoarte-pzu-raportPIP-export-csv/{DD}/{MM}/{YYYY}/en?resolution=60`. Răspuns: CSV cu header `Interval,Average Price [Euro/MWh],Resolution` — 24 de intervale în zilele normale, **23 la trecerea la ora de vară** (ora 02:00–03:00 nu există), **25 la trecerea la ora de iarnă** (ora 02:00–03:00 apare de două ori). Verificat live: mediile zilnice se potrivesc exact cu cele publicate de presă (13 aug = 163,54 €/MWh; 14 aug = 142,91 €/MWh). Zilele fără date publicate (de ex. viitoare) răspund cu payload gol (0B).
+
+**Captura** — `python3 scripts/convert-sen.py --capture-prices`:
+
+- `fetch_prices_day(date)` — descarcă CSV-ul unei zile (UA, timeout 20s); payload gol / format neașteptat / eșec de rețea → `None` (sari peste zi, silențios).
+- `parse_prices_csv(text)` — funcție pură: header + `Average Price [Euro/MWh]` (float, finit — respinge NaN/Inf/non-numeric).
+- `merge_prices(existing, day)` — funcție pură: **dedupe/suprascriere pe `date`** (OPCOM poate publica revizuiri), sortare ascendentă; record-urile invalide (fără `date`/`prices`) sunt excluse.
+- `capture_prices()` — descarcă **ultimele 35 de zile** (`PRICES_BACKFILL_DAYS`): backfill-ul larg e intenționat (acoperă preset-ul de 30 de zile al dashboard-ului + marjă), e indempotent (suprascrie aceleași date) și ieftin (~35 requesturi de ~600B la o rulare zilnică). Scrie **`data/sen-prices.json`**: `[{"date": "YYYY-MM-DD", "prices": [24 prețuri], "currency": "EUR"}]`. Dacă nici-o zi nu aduce date noi → „No new prices", nu rescrie nimic.
+- **Automatizare**: workflow-ul [`.github/workflows/price-capture.yml`](../.github/workflows/price-capture.yml) — cron **zilnic** (`0 11 * * *` UTC ≈ 13:00–14:00 ora României, după publicarea PZU pentru ziua curentă), commit doar dacă fișierul s-a schimbat — pasul de captură **nu** folosește `continue-on-error` (toleranța la eșec e internă în script; erorile reale ies non-zero și sunt vizibile în Actions), cu `git pull --rebase --autostash` + push cu retry (3 încercări) ca la celelalte workflow-uri. ~35 requesturi/zi = neglijabil pe free tier.
+- **Testabilitate**: `SEN_PRICES_URL_TEMPLATE`, `SEN_PRICES_OUT`, `SEN_PRICES_BACKFILL_DAYS` sunt overridable prin env (mock server + fișiere temporare în teste) — logica e acoperită de `tests/capture-prices.test.ts`.
+
+**Runtime** — [`src/lib/sen/prices.ts`](../src/lib/sen/prices.ts) (server-only) + [`src/lib/sen/costs.ts`](../src/lib/sen/costs.ts) (pur):
+
+- `loadPriceDays()` / `getPriceDays()` — seria capturată (cache singleton, ordonată pe dată); fișier lipsă/corupt → listă goală (NU 500).
+- `priceForHour(day, hour)` — prețul intervalului de livrare `hour+1` (aliniere: OPCOM pune intervalul N = ora wall-clock N−1; indexare directă, contract fake-UTC — **limitare cunoscută**: pe zilele DST cu 23/25 de intervale indexarea directă poate fi decalată cu o oră după ora sărită; 2 zile/an, iar cifra e oricum o estimare etichetată — se rezolvă cu date reale când se apropie octombrie).
+- `computeCosts(points, priceDays, granularity)` — **cost = Σ (importMWh × preț orar)**, venit = Σ (exportMWh × preț orar), net = cost − venit. Orele fără preț sunt **excluse** din cost (fallback onest) și numărate la `totalHours`; `hasPrices = false` dacă niciuna nu are preț → cardul afișează „prețuri indisponibile". MWh = MW × durata bucket-ului (`bucketHours`: 1h la `hour`, 10/60 la `10m`).
+- `intervalStats(points)` — media consum/producție și vârful de consum pe interval (footer „Consum vs. Producție", fără prețuri).
+- **IMPORTANT — ce e și ce nu e acoperit**: prețurile PZU sunt cele fixate la licitația day-ahead. Costul REAL al schimburilor include și intraday + echilibrare, care nu sunt publice în timp real → **estimare bazată pe PZU**, nu cost final (UI-ul afișează explicit eticheta).
+
+> **Nu modifica manual `data/sen-prices.json`** — e generat de `--capture-prices` (aceeași regulă ca `sen-storage.json`).
+
 ## 7. Date live la runtime: `src/lib/sen/live.ts`
 
 - `parseLiveLine` / `parseLivePayload` — parsează textul de la endpoint (funcții pure, testate).
@@ -170,6 +205,7 @@ Site-ul oficial afișează Consum/Producție/Sold „real-time" poll-uind `/sen-
 bun run data:convert      # rebuild complet din xlsx
 bun run data:refresh      # fetch incremental live (adaugă datele noi)
 python3 scripts/convert-sen.py --capture-storage   # captură manuală stocare (ISPOZ)
+python3 scripts/convert-sen.py --capture-prices    # captură manuală prețuri PZU (OPCOM)
 # apoi repornește serverul (loader-ul are cache singleton)
 ```
 

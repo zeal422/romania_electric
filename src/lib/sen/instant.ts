@@ -72,7 +72,10 @@ const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari
 // Python): respinge hex/binary/octal/underscore — doar zecimale (+ exponent).
 const DECIMAL_RE = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
 
-const TS_RE = /^(\d{2})\/(\d{1,2})\/(\d{1,2}) (\d{2}):(\d{2}):(\d{2})$/;
+// Ora/minutul/secundele pot veni cu UNA sau DOUĂ cifre (verificat pe payload
+// real: „26/8/15 8:10:33” — ora 8 fără zero-padding). Range-urile sunt validate
+// explicit mai jos (hh ≤ 23 etc.), deci acceptarea a 1–2 cifre e sigură.
+const TS_RE = /^(\d{2})\/(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})$/;
 
 let cache: { data: InstantData; fetchedAt: number } | null = null;
 let lastFailedAt = 0;

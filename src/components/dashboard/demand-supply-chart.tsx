@@ -27,7 +27,11 @@ export function DemandSupplyChart({ points, granularity }: DemandSupplyChartProp
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+      {/* bottom: 20 — spațiu garantat între zona de plot și etichetele X, ca
+          liniile (care coboară spre minimul datelor) să nu atingă textul
+          etichetelor (ex: „12 aug”). Fără acest spațiu, linia Producție pare
+          că „trece prin” date. */}
+      <LineChart data={points} margin={{ top: 8, right: 12, bottom: 20, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
         <XAxis
           dataKey="ts"

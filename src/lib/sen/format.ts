@@ -76,6 +76,78 @@ export function formatPercent(value: number, decimals = 1): string {
   return `${formatNumber(value, decimals)}%`;
 }
 
+/**
+ * Formatează o sumă în EUR ca milioane, ex: "1,24 mil €" (valoare negativă →
+ * prefix „−"). Folosit de cardul de costuri (prețurile PZU sunt în EUR/MWh).
+ */
+export function formatEurMillions(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return "—";
+  const sign = value < 0 ? "−" : "";
+  return `${sign}${formatNumber(Math.abs(value) / 1_000_000, decimals)} mil €`;
+}
+
+/**
+ * Interval personalizat (calendar range) → granițe epoch, clampate la datele
+ * disponibile. Ziua aleasă = zi întreagă în granițe UTC (contract fake-UTC):
+ * `from` = 00:00:00.000 al zilei de start, `to` = 23:59:59.999 al zilei de
+ * final, ambele strânse în [startTs, endTs]. Returnează null pentru input
+ * invalid (date lipsă/invalide sau from > to) — apelantul cade pe preset.
+ *
+ * Extrasă din page.tsx (fix: logica de granițe UTC era închisă în componentă,
+ * netestabilă). Pură și deterministă (AGENTS §4.2) — testabilă unitar.
+ */
+export function customRangeToBoundaries(
+  customRange: { from: string; to: string } | undefined,
+  startTs: number,
+  endTs: number,
+): { from: number; to: number } | null {
+  if (!customRange) return null;
+  const fromIso = new Date(`${customRange.from}T00:00:00.000Z`).getTime();
+  const toIso = new Date(`${customRange.to}T23:59:59.999Z`).getTime();
+  if (!Number.isFinite(fromIso) || !Number.isFinite(toIso) || fromIso > toIso) return null;
+  return {
+    from: Math.max(startTs, fromIso),
+    to: Math.min(endTs, toIso),
+  };
+}
+
+/**
+ * Etichetă compactă de interval pentru footer-urile de card (ex: „8–15 aug”
+ * pentru 7 zile, „8 aug 18:07 – 9 aug 18:07” pentru 24h). Folosește getters
+ * UTC (contract fake-UTC — vezi formatDateTime): cifrele din sursă apar
+ * identic pe orice fus orar.
+ *
+ * - interval ≥ 24h: doar data („8–15 aug”; dacă anii diferă, include anul);
+ * - interval < 24h: data + ora („8 aug 18:07 – 9 aug 06:07”).
+ *
+ * Pură și deterministă (AGENTS §4.2) — testabilă unitar.
+ */
+export function formatRangeLabel(from: number, to: number): string {
+  const d1 = new Date(from);
+  const d2 = new Date(to);
+  const month1 = d1.toLocaleString(RO, { month: "short", timeZone: "UTC" }).replace(/\.$/, "");
+  const month2 = d2.toLocaleString(RO, { month: "short", timeZone: "UTC" }).replace(/\.$/, "");
+  const day1 = d1.getUTCDate();
+  const day2 = d2.getUTCDate();
+  const hh1 = String(d1.getUTCHours()).padStart(2, "0");
+  const mm1 = String(d1.getUTCMinutes()).padStart(2, "0");
+  const hh2 = String(d2.getUTCHours()).padStart(2, "0");
+  const mm2 = String(d2.getUTCMinutes()).padStart(2, "0");
+  const y1 = d1.getUTCFullYear();
+  const y2 = d2.getUTCFullYear();
+
+  const sameDay = day1 === day2 && month1 === month2 && y1 === y2;
+  if (to - from < 24 * 3_600_000 && sameDay) {
+    return `${day1} ${month1} ${hh1}:${mm1} – ${hh2}:${mm2}`;
+  }
+  if (to - from < 24 * 3_600_000) {
+    return `${day1} ${month1} ${hh1}:${mm1} – ${day2} ${month2} ${hh2}:${mm2}`;
+  }
+  if (y1 !== y2) return `${day1} ${month1} ${y1} – ${day2} ${month2} ${y2}`;
+  if (month1 !== month2) return `${day1} ${month1} – ${day2} ${month2} ${y2}`;
+  return `${day1}–${day2} ${month2} ${y2}`;
+}
+
 /** Formatează energy (MW) ca GWh estimat pentru o perioadă dată în ore. */
 export function mwToGwh(mw: number, hours: number): number {
   return (mw * hours) / 1000;

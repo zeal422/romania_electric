@@ -12,6 +12,7 @@ Toate rutele sunt în `src/app/api/sen/`. Sunt `force-dynamic` (fără cache la 
 | `GET /api/sen/summary` | KPI global precalculat                                         |
 | `GET /api/sen/instant` | Valori real-time (Consum/Producție/Sold + mix), `null` la eșec |
 | `GET /api/sen/storage` | Stocare (ISPOZ): valoare curentă + serie acumulată             |
+| `GET /api/sen/costs`   | Costuri estimate import/export (volume × prețuri PZU)          |
 | `GET /api/sen/export`  | Export CSV                                                     |
 
 ### `GET /api/sen` — date agregate într-un interval
@@ -122,6 +123,37 @@ Fără parametri. Întoarce valoarea curentă de stocare + seria acumulată de c
 - Folosit de `StorageCard` prin [`src/hooks/use-storage-data.ts`](../src/hooks/use-storage-data.ts) (query key `["sen","storage"]`, `refetchInterval 60s`).
 
 **Cache:** `public, s-maxage=120, stale-while-revalidate=600`.
+
+---
+
+### `GET /api/sen/costs` — costuri estimate import/export
+
+**Query params:** `from`, `to` (epoch ms, opționali — default capetele întregului set de citiri).
+
+**Răspuns** (`CostsApiResponse`, vezi [`types.ts`](../src/lib/sen/types.ts)):
+
+```json
+{
+  "range": { "from": "…", "to": "…" },
+  "costs": {
+    "importMWh": 20520,
+    "exportMWh": 6120,
+    "cost": 3960000,
+    "revenue": 480000,
+    "net": 3480000,
+    "coveredHours": 24,
+    "totalHours": 24,
+    "hasPrices": true
+  }
+}
+```
+
+- **Costul estimat al schimburilor** în intervalul selectat: volumele reale Transelectrica (MWh, agregat orar) × prețurile PZU orare OPCOM (EUR/MWh). Cost = Σ (importMWh × preț), venit = Σ (exportMWh × preț), `net = cost − venit` (pozitiv = plătim net, negativ = încasăm net).
+- **Orele fără preț** (zi fără captură, interval în afara istoricului) sunt **excluse** din cost/venit; `hasPrices = false` dacă niciuna nu are preț → UI-ul afișează „prețuri indisponibile", nu zerouri.
+- **Eticheta de onestitate** (afișată de UI): prețurile PZU sunt cele day-ahead; costul real include și intraday + echilibrare — cifra e o **estimare**, nu costul final.
+- Datele vin din `getLiveReadings()` (volume) + `getPriceDays()` (prețuri capturate de workflow-ul `price-capture` în `data/sen-prices.json`) — vezi [02-pipeline-date.md](./02-pipeline-date.md).
+
+**Cache:** `public, s-maxage=60, stale-while-revalidate=300`.
 
 ---
 

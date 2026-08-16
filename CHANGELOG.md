@@ -6,6 +6,53 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.26] — 2026-08-15, 06:35 EEST
+
+### Adăugat
+
+- **Costul estimat al importurilor/exporturilor (PZU)** — în cardurile „Consum vs. Producție" și „Balanța energetică (Sold)" apar acum rânduri de rezumat de înălțime egală (simetrie vizuală): **cost import / venit export / sold net** pe intervalul selectat, plus media consum/producție și vârful de consum în celălalt card.
+- **Sursa de prețuri**: export CSV public OPCOM (prețuri PZU orare în €/MWh, fără cheie/API/înregistrare — la fel ca Transelectrica pentru datele fizice), format verificat pe 15 probe live (istoric din noiembrie 2025, weekend, DST de primăvară 23 intervale, zile viitoare → payload gol, robots permis, fără rate limit).
+- **`.github/workflows/price-capture.yml`** — cron zilnic (11:00 UTC ≈ 13:00–14:00 RO, după publicarea PZU) care rulează `--capture-prices` (backfill automat ~35 zile, idempotent) și comite `data/sen-prices.json`.
+- **`src/lib/sen/costs.ts`** — funcții pure (`priceForHour`, `computeCosts`, `intervalStats`) pentru cost = MWh import × preț PZU orar; **`src/lib/sen/prices.ts`** — loader server-only cu cache TTL.
+- **`GET /api/sen/costs?from&to`** + hook client `use-sen-costs` + componenta reutilizabilă `ChartSummary` (footer simetric în carduri).
+- **Eticheta de onestitate** permanentă: _„Estimare bazată pe prețurile PZU (day-ahead); costul real include intraday și echilibrare."_
+- 19 teste noi (`tests/sen/costs.test.ts`, `tests/capture-prices.test.ts`) — total **216** (inclusiv invariantul `totalHours` = ore unice din interval, nu zile + `formatRangeLabel`).
+
+### Corectat
+
+- **`totalHours` subnumăra orele la granița de lună (bug logic real)**: cheia de dedupe din `computeCosts` (an×10000 + lună×100 + zi×24 + oră) COLIDA — ex: 19 iul 14:00 == 15 aug 10:00 (20261070), ambele în preset-ul real de 30 de zile (verificat empiric: 100 coliziuni într-o fereastră de 30 de zile) → `totalHours` raportat de `/api/sen/costs` era mai mic decât numărul real de ore. Fix: cheie = indicele UTC de oră (`Math.floor(ts / 3_600_000)` — unică global, verificată pe 60 de zile) + test de regresie cu perechea colizionantă. Impact vizibil: doar câmpul `totalHours` din API (cardul afișează doar cost/venit/sold net — neschimbat).
+- **AGENTS.md rămăsese la count-ul vechi de teste (179)**: actualizat la 216 + workflow-ul `price-capture.yml` adăugat în lista de workflow-uri; CHANGELOG corectat (count-urile „202"/„203" → 216, era 179).
+
+### Corectat (UX)
+
+- **Graficul „Consum vs. Producție" era o „linie verticală"** (SVG colapsat la ~21px): zona de chart din `SectionCard` avea `flex-1`, iar flex-shrink-ul o comprima la conținutul textului când grid-ul calcula rândul → Recharts măsura ~21px. Fix: `shrink-0` + înălțime fixă — graficele au acum dimensiunea completă (300px), cu date reale (problema era preexistentă pe HEAD 0.3.25, confirmat pe worktree separat).
+- **Linia „Producție" nu mai atinge/trage prin etichetele de dată** (ex: „12 aug"): `DemandSupplyChart` și `BalanceChart` au acum `margin.bottom: 20` — spațiu garantat între zona de plot și etichetele X (producția coboară spre ~3.200 MW noaptea, iar cu `bottom: 0` linia verde ajungea la nivelul textului).
+- **Numerele de la „Balanța energetică" au acum context explicit**: footer-ul (`ChartSummary`) afișează titlul de perioadă (ex: „Ultimele 7 zile · 8–15 aug 2026") deasupra valorilor, ca utilizatorul să știe pe ce termen sunt calculate costurile; notele explicitează unitățile („mil €") și că e o estimare PZU (intraday + echilibrare nu sunt incluse).
+- **Footer-ul „Consum vs. Producție"** primește același titlu de perioadă (simetrie) + unitatea „MW" lângă medii/vârf.
+
+### Adăugat (UX)
+
+- **Selectarea perioadei personalizate**: butonul „Personalizat" din bara de filtre deschide un calendar range (react-day-picker, deja în proiect) constrâns la datele disponibile; intervalul ales se aplică imediat (granițe UTC, zile întregi), **persistă la refresh** (`sen:custom-range`) și e reflectat în footer-urile cardurilor (ex: „Personalizat · 9–13 aug 2026").
+- **Selector de perioadă direct pe carduri** (`RangePicker` în `range-picker.tsx`): cele două carduri pereche („Consum vs. Producție" / „Balanța energetică") au acum în header un buton compact cu perioada activă (ex: „7 zile" / „9–13 aug 2026") care deschide același control ca bara de filtre — preset-uri rapide + calendar range — cu starea partajată (schimbi de oriunde, se sincronizează peste tot). Fără să te întorci sus la filtre, fiecare grafic își poate schimba intervalul direct.
+
+### Corectat (UX)
+
+- **Tooltip-ul „Balanței energetice" afișa „Sold" de 3 ori / valoare duplicată**: seriile de fill pentru gradient (`soldImport`/`soldExport`, clamate la 0 pe celălalt semn) apăreau în tooltip ca rânduri separate („Import"/„Export") cu aceeași valoare ca „Sold net" — sau ca zerouri constante. Fix: `ChartTooltip` suportă acum `hideKeys` (excludere pe cheie) + `hideZero`; balanța exclude explicit seriile de fill → tooltip-ul arată doar seria reală („Sold net"), cu nume distincte și fără zerouri.
+- **Graficul mare „Producția pe surse" era comprimat vertical (SVG 360px, gol dedesubt)**: fix-ul anterior pentru cardurile de jos (`shrink-0` + înălțime fixă) blocase și cardul mare la `chartHeight` fix, deși rândul lui e împins de coloana laterală (Mixul curent + Stocare = ~800px). Fix: prop nou `stretch` pe `SectionCard` (`flex-1` + `min-height`) — graficul mare se întinde din nou să umple rândul (~696px, ca pe HEAD), iar cardurile de jos rămân la 300px fix. Verificat pe HEAD în worktree separat.
+- **Linia de consum lipsea din graficul mare (bug preexistent)**: `<Line>` nu se randează deloc în interiorul unui `AreaChart` în recharts 2.15.4 (verificat în izolare pe SSR + în browser, prezent și pe HEAD 0.3.25) — subtitlul promitea „vs. consum (linie punctată)", dar linia nu apărea. Fix: `AreaChart` → `ComposedChart` (există exact pentru a combina arii stivuite + linii). Acum graficul are 7 arii + linia de consum punctată deasupra.
+- **Soldul/valorile real-time „blocate" (bug real descoperit live, NU introdus de modificările recente)**: `parseInstantTimestamp` din `instant.ts` cerea ora cu 2 cifre (`\d{2}`), dar Transelectrica NU face zero-padding la oră când e < 10 — payload real `"26/8/15 8:10:33"` era respins → `getInstantData()` → `null` → UI-ul cădea pe seria istorică (~08:00) și soldul părea înghețat deși pe site-ul oficial se mișcă. Fix: regex permisiv `\d{1,2}` pentru oră/minut/secundă (range-urile rămân validate explicit) + test de regresie pe formatul real capturat. Verificat pe payload live: `getInstantData` întoarce din nou date (sold −308 MW, t = 08:11:06) și header-ul arată ora real-time.
+- **Linia de consum nu era identificabilă ca „Consum" (UX)**: pe graficul mare linia punctată nu avea nicio etichetă — acum are **etichetă „Consum" lângă ultimul punct** (`LabelList` copil al `Line` cu `content` custom, culoarea seriei — eticheta e în SVG, nu ocupă spațiu vertical) + **intrare „Consum" în legenda comună** de sub grid (`SourceLegend`, linie punctată `SERIES_COLORS.consum`, element static — consumul nu e sursă, deci fără hover). Deliberat NU în interiorul cardului: ar fi furat spațiu din înălțimea graficului. Graficul rămâne la înălțimea completă (696px).
+
+### Adăugat (teste de regresie pentru logică UI)
+
+- **`src/lib/sen/tooltip.ts`** — funcția pură `buildTooltipRows` (filtrare/sortare/mapare rânduri tooltip) extrasă din `ChartTooltip`: componenta doar randează, logica (care a avut 2 bug-uri reale: seriile de fill ale balanței ca „Import"/„Export" duplicate + zerouri constante) e acum testabilă fără RTL, model `buildLegendRows`. 8 teste noi în `tests/sen/tooltip.test.ts` (`hideZero`, `hideKeys`, `showTotals`, intrări nenumerice, payload gol, fallback nume/unit/color, sortare).
+- **`customRangeToBoundaries`** în `format.ts` — logica intervalului personalizat (calendar range → granițe UTC `00:00`→`23:59:59.999`, clampate la datele disponibile, `null` la input invalid) extrasă din `page.tsx`; 4 teste noi în `tests/sen/format.test.ts`. Total **216 teste** (era 179).
+
+### Notă
+
+- Costul e în **milioane EUR** (prețurile OPCOM sunt în €/MWh); conversia în lei (curs BNR zilnic) rămâne pentru o versiune viitoare.
+- Dacă prețurile lipsesc (OPCOM indisponibil), cardurile afișează doar volumele — site-ul nu se rupe.
+
 ## [0.3.25] — 2026-08-14, 06:40 EEST
 
 ### Adăugat

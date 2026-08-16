@@ -18,7 +18,7 @@ Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**,
 bun install            # instalează dependențele (Bun, NU npm/pnpm/yarn)
 bun run dev            # server de dezvoltare pe :3000
 bun run check          # CI complet: format → docs → lint → typecheck → teste → build
-bun test               # 179 de teste unitare — TOATE trebuie să treacă
+bun test               # 216 de teste unitare — TOATE trebuie să treacă
 bun run typecheck      # tsc --noEmit — trebuie să fie curat
 bun run lint           # ESLint — trebuie să fie curat
 bun run format:check   # Prettier — trebuie să fie curat
@@ -42,8 +42,8 @@ src/hooks/          ← Hook-uri client (React Query) — incl. use-storage-data
 src/components/dashboard/ ← UI dashboard (incl. storage-card.tsx). src/components/ui/ = shadcn/ui (nu modifica de mână).
 data/               ← sen-data.json + sen-summary.json + sen-storage.json (GENERATE, nu le edita manual).
 scripts/            ← convert-sen.py (pipeline date + --capture-storage) + check-hydration.sh (CI).
-.github/workflows/  ← data-refresh.yml (zilnic) + storage-capture.yml (orar).
-tests/              ← 179 de teste unitare (lib/sen + storage + instant + captură Python + preferințe).
+.github/workflows/  ← data-refresh.yml (zilnic) + storage-capture.yml (orar) + price-capture.yml (zilnic).
+tests/              ← 216 de teste unitare (lib/sen + storage + instant + captură Python + preferințe).
 upload/             ← Grafic_SEN.xlsx (sursa datelor).
 ```
 

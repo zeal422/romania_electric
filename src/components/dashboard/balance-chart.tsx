@@ -29,7 +29,17 @@ interface BalanceChartProps {
  * (Semantica sold din sursa oficială: SOLD = CONS − PROD.)
  */
 export function BalanceChart({ points, granularity }: BalanceChartProps) {
-  const labels = useMemo(() => ({ sold: "Sold" }), []);
+  // Etichete clare pentru tooltip: seriile din spate (import/export, folosite
+  // DOAR pentru fill) au nume distincte, iar linia principală e „Sold net”.
+  // Fără nume distincte, tooltip-ul ar afișa „Sold” de 3 ori (nonsens).
+  const labels = useMemo(
+    () => ({
+      soldImport: "Import",
+      soldExport: "Export",
+      sold: "Sold net",
+    }),
+    [],
+  );
 
   // Split pe semn pentru fill divergent: serii clamate la zero, ca fiecare arie
   // să primească gradientul corect — import (sold > 0, grad-sold-pos) și
@@ -60,7 +70,9 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+      {/* bottom: 20 — spațiu garantat între zona de plot și etichetele X, ca
+          ariile/linia să nu atingă textul etichetelor (ex: „12 aug”). */}
+      <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 20, left: 0 }}>
         <defs>
           <linearGradient id="grad-sold-pos" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={SERIES_COLORS.soldPositive} stopOpacity={0.7} />
@@ -90,13 +102,24 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
         />
         <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeWidth={1} />
         <Tooltip
-          content={<ChartTooltip labels={labels} />}
+          content={
+            <ChartTooltip
+              labels={labels}
+              hideZero
+              // Seriile de fill (import/export) există DOAR pentru gradient —
+              // nu au voie în tooltip. Recharts nu le filtrează cu
+              // tooltipType="none" când conținutul e custom, deci le excludem
+              // explicit pe cheie (altfel s-ar afișa „Export -75” lângă
+              // „Sold net -75” — aceeași valoare de două ori).
+              hideKeys={["soldImport", "soldExport"]}
+            />
+          }
           cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 3" }}
         />
         <Area
           type="monotone"
           dataKey="soldImport"
-          name="sold"
+          name="Import"
           stroke="none"
           fill="url(#grad-sold-pos)"
           isAnimationActive={false}
@@ -105,7 +128,7 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
         <Area
           type="monotone"
           dataKey="soldExport"
-          name="sold"
+          name="Export"
           stroke="none"
           fill="url(#grad-sold-neg)"
           isAnimationActive={false}
@@ -114,7 +137,7 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
         <Area
           type="monotone"
           dataKey="sold"
-          name="sold"
+          name="Sold net"
           stroke="var(--foreground)"
           strokeWidth={1.25}
           fill="none"

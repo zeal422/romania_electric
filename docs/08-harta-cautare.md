@@ -25,17 +25,21 @@
 | De unde vine fișierul sursă?                                        | `upload/Grafic_SEN.xlsx`                                                                                                                                                                           |
 | Unde e logica de stocare (ISPOZ)?                                   | [`src/lib/sen/storage.ts`](../src/lib/sen/storage.ts) (server-only) + [`scripts/convert-sen.py`](../scripts/convert-sen.py) `--capture-storage`                                                    |
 | Unde e seria capturată de stocare?                                  | `data/sen-storage.json` (generată orar de workflow-ul `storage-capture`)                                                                                                                           |
+| De unde vin prețurile PZU (day-ahead)?                              | [`src/lib/sen/prices.ts`](../src/lib/sen/prices.ts) (server-only) + [`scripts/convert-sen.py`](../scripts/convert-sen.py) `--capture-prices` (OPCOM CSV public)                                    |
+| Cum se calculează costurile import/export?                          | [`src/lib/sen/costs.ts`](../src/lib/sen/costs.ts) — funcții pure (`computeCosts`, `priceForHour`, `intervalStats`)                                                                                 |
+| Unde e seria capturată de prețuri?                                  | `data/sen-prices.json` (generată zilnic de workflow-ul `price-capture`)                                                                                                                            |
 
 ### API
 
-| Întrebare                       | Fișier                                                                                                                            |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Ce face `GET /api/sen`?         | [`src/app/api/sen/route.ts`](../src/app/api/sen/route.ts)                                                                         |
-| Ce face `GET /api/sen/summary`? | [`src/app/api/sen/summary/route.ts`](../src/app/api/sen/summary/route.ts)                                                         |
-| Ce face `GET /api/sen/export`?  | [`src/app/api/sen/export/route.ts`](../src/app/api/sen/export/route.ts)                                                           |
-| Ce face `GET /api/sen/storage`? | [`src/app/api/sen/storage/route.ts`](../src/app/api/sen/storage/route.ts)                                                         |
-| Ce face `GET /api/sen/instant`? | [`src/app/api/sen/instant/route.ts`](../src/app/api/sen/instant/route.ts) — valori real-time (`null` la eșec)                     |
-| Cum apelează clientul API-ul?   | [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts) + [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts) |
+| Întrebare                       | Fișier                                                                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ce face `GET /api/sen`?         | [`src/app/api/sen/route.ts`](../src/app/api/sen/route.ts)                                                                                                                                         |
+| Ce face `GET /api/sen/summary`? | [`src/app/api/sen/summary/route.ts`](../src/app/api/sen/summary/route.ts)                                                                                                                         |
+| Ce face `GET /api/sen/export`?  | [`src/app/api/sen/export/route.ts`](../src/app/api/sen/export/route.ts)                                                                                                                           |
+| Ce face `GET /api/sen/storage`? | [`src/app/api/sen/storage/route.ts`](../src/app/api/sen/storage/route.ts)                                                                                                                         |
+| Ce face `GET /api/sen/costs`?   | [`src/app/api/sen/costs/route.ts`](../src/app/api/sen/costs/route.ts) — costuri estimate import/export (volume × prețuri PZU)                                                                     |
+| Ce face `GET /api/sen/instant`? | [`src/app/api/sen/instant/route.ts`](../src/app/api/sen/instant/route.ts) — valori real-time (`null` la eșec)                                                                                     |
+| Cum apelează clientul API-ul?   | [`src/hooks/use-sen-data.ts`](../src/hooks/use-sen-data.ts) + [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts) + [`src/hooks/use-sen-costs.ts`](../src/hooks/use-sen-costs.ts) |
 
 ### UI
 
@@ -50,6 +54,8 @@
 | De unde vin valorile instant în KPI/Mix/Header?                       | [`src/hooks/use-instant-data.ts`](../src/hooks/use-instant-data.ts) → `GET /api/sen/instant` (polling 30s)                                                                           |
 | Cum arată consum vs producție?                                        | [`src/components/dashboard/demand-supply-chart.tsx`](../src/components/dashboard/demand-supply-chart.tsx)                                                                            |
 | Cum arată balanța import/export?                                      | [`src/components/dashboard/balance-chart.tsx`](../src/components/dashboard/balance-chart.tsx)                                                                                        |
+| Unde e rândul de rezumat (footer) al cardurilor pereche?              | [`src/components/dashboard/chart-summary.tsx`](../src/components/dashboard/chart-summary.tsx) (primit prin prop-ul `footer` al `SectionCard`)                                        |
+| De unde ia cardul „Balanța" costurile?                                | [`src/hooks/use-sen-costs.ts`](../src/hooks/use-sen-costs.ts) → `GET /api/sen/costs`                                                                                                 |
 | Cum arată tabelul de date?                                            | [`src/components/dashboard/data-table.tsx`](../src/components/dashboard/data-table.tsx)                                                                                              |
 | Cum funcționează filtrele (preset-uri, granularitate, export)?        | [`src/components/dashboard/filters.tsx`](../src/components/dashboard/filters.tsx)                                                                                                    |
 | Cum funcționează toggle-ul de temă?                                   | [`src/components/dashboard/theme-toggle.tsx`](../src/components/dashboard/theme-toggle.tsx) + [`src/hooks/use-mounted.ts`](../src/hooks/use-mounted.ts)                              |
@@ -68,11 +74,11 @@
 
 ### Teste & tooling
 
-| Întrebare                  | Fișier                                                                                                                                                                                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unde sunt testele unitare? | [`tests/sen/`](../tests/sen/) + [`tests/local-preference.test.ts`](../tests/local-preference.test.ts) + [`tests/storage.test.ts`](../tests/storage.test.ts) + [`tests/capture-storage.test.ts`](../tests/capture-storage.test.ts) |
-| Cum rulez tot CI-ul?       | `package.json` → scriptul `check`                                                                                                                                                                                                 |
-| Cum verific hidratarea?    | [`scripts/check-hydration.sh`](../scripts/check-hydration.sh)                                                                                                                                                                     |
+| Întrebare                  | Fișier                                                                                                                                                                                                                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unde sunt testele unitare? | [`tests/sen/`](../tests/sen/) + [`tests/local-preference.test.ts`](../tests/local-preference.test.ts) + [`tests/storage.test.ts`](../tests/storage.test.ts) + [`tests/capture-storage.test.ts`](../tests/capture-storage.test.ts) + [`tests/capture-prices.test.ts`](../tests/capture-prices.test.ts) |
+| Cum rulez tot CI-ul?       | `package.json` → scriptul `check`                                                                                                                                                                                                                                                                     |
+| Cum verific hidratarea?    | [`scripts/check-hydration.sh`](../scripts/check-hydration.sh)                                                                                                                                                                                                                                         |
 
 ### Documentație
 

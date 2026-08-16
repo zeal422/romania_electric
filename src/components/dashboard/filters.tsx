@@ -1,8 +1,12 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { CalendarDays, Download } from "lucide-react";
+import { useState } from "react";
+import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -10,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { granularityLabel } from "@/lib/sen/format";
+import { formatRangeLabel, granularityLabel } from "@/lib/sen/format";
 import { GRANULARITIES, granularitiesForPreset, type Granularity } from "@/lib/sen/types";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +31,10 @@ export const RANGE_PRESETS: RangePreset[] = [
   { id: "7d", label: "7 zile", msBack: 7 * 24 * 3_600_000 },
   { id: "30d", label: "30 zile", msBack: 30 * 24 * 3_600_000 },
   { id: "all", label: "Tot intervalul", msBack: null },
+  // „Personalizat” NU are o fereastră relativă: intervalul vine din datele
+  // alese de utilizator (calendar range), stocate de page.tsx. `msBack: null`
+  // îl tratează ca „all” în logica de granularitate (orice granularitate merge).
+  { id: "custom", label: "Personalizat", msBack: null },
 ];
 
 interface FiltersProps {
@@ -38,6 +46,8 @@ interface FiltersProps {
   onGranularityChange: (g: Granularity) => void;
   from: number;
   to: number;
+  /** Aplică un interval personalizat ales din calendar (epoch ms). */
+  onCustomRangeChange: (from: number, to: number) => void;
 }
 
 /**
@@ -55,8 +65,14 @@ export function Filters({
   onGranularityChange,
   from,
   to,
+  onCustomRangeChange,
 }: FiltersProps) {
   const availableGranularities = granularitiesForPreset(activePreset);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  // Selecția din calendar (range) e INTERNĂ — la deschidere începe curată,
+  // altfel react-day-picker preia range-ul curent (ex: 7 zile) și primul click
+  // îl completează imediat (popover-ul s-ar închide din prima zi).
+  const [calendarRange, setCalendarRange] = useState<DateRange | undefined>(undefined);
 
   function handleExport() {
     const params = new URLSearchParams({
@@ -91,6 +107,67 @@ export function Filters({
           );
         })}
       </div>
+
+      {/* Interval personalizat: calendar range (react-day-picker), constrâns la
+          datele disponibile. La selecție, page.tsx salvează intervalul și trece
+          pe preset-ul „custom”. */}
+      <Popover
+        open={calendarOpen}
+        onOpenChange={(open) => {
+          setCalendarOpen(open);
+          if (open) setCalendarRange(undefined); // selecție curată la fiecare deschidere
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "glass-panel flex h-9 items-center gap-1.5 rounded-xl border border-border/70 px-3 text-xs font-medium shadow-2xs backdrop-blur-xs transition-all duration-200",
+              activePreset === "custom"
+                ? "bg-primary text-primary-foreground shadow-xs shadow-primary/25"
+                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+            )}
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            {activePreset === "custom" && from > 0 && to > 0
+              ? formatRangeLabel(from, to)
+              : "Personalizat"}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2" align="end">
+          <Calendar
+            mode="range"
+            selected={calendarRange}
+            onSelect={(range) => {
+              // react-day-picker în mod „range” întoarce la primul click un range
+              // de-o zi (from === to). Îl păstrăm ca început (highlight), dar NU
+              // aplicăm/închidem decât când utilizatorul a ales și capătul.
+              setCalendarRange(range);
+              if (range?.from && range?.to && range.from.getTime() !== range.to.getTime()) {
+                // Granițe UTC (contract fake-UTC): o zi aleasă = ziua întreagă.
+                const f = Date.UTC(
+                  range.from.getUTCFullYear(),
+                  range.from.getUTCMonth(),
+                  range.from.getUTCDate(),
+                );
+                const t = Date.UTC(
+                  range.to.getUTCFullYear(),
+                  range.to.getUTCMonth(),
+                  range.to.getUTCDate(),
+                  23,
+                  59,
+                  59,
+                  999,
+                );
+                onCustomRangeChange(f, t);
+                setCalendarOpen(false);
+              }
+            }}
+            disabled={[{ before: new Date(startTs), after: new Date(endTs) }]}
+            defaultMonth={to > 0 ? new Date(to) : undefined}
+          />
+        </PopoverContent>
+      </Popover>
 
       <Select value={granularity} onValueChange={(v) => onGranularityChange(v as Granularity)}>
         <SelectTrigger

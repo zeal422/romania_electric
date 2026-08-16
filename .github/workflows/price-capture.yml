@@ -1,0 +1,84 @@
+name: price-capture
+
+# Captură zilnică a prețurilor PZU (day-ahead) de la OPCOM — România.
+#
+# OPCOM publică prețurile orare per zi de livrare ca export CSV public (fără
+# cheie, fără înregistrare — la fel cum Transelectrica expune widget-ul SEN):
+#   https://www.opcom.ro/rapoarte-pzu-raportPIP-export-csv/{DD}/{MM}/{YYYY}/en?resolution=60
+#
+# Cron la ~11:00 UTC (≈13:00-14:00 ora României): prețurile PZU pentru ziua de
+# livrare curentă sunt publicate de OPCOM în ziua precedentă la ~13:00 CET,
+# deci la rulare ziua curentă e deja disponibilă. Scriptul descarcă ultimele
+# 35 de zile (backfill indempotent, acoperă preset-ul de 30 de zile al
+# dashboard-ului) și scrie data/sen-prices.json cu dedupe pe dată.
+# Commit-ul declanșează redeploy-ul Vercel (Git integration).
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Capture PZU prices (OPCOM CSV, backfill 35 days)
+        # Fără continue-on-error: un eșec tranzitoriu de rețea e deja tolerat de
+        # script (fetch_prices_day prinde URLError/Exception intern și sare peste
+        # zi; dacă NICI-o zi nu aduce date noi, ieșirea e „No new prices" → step-ul
+        # de commit nu găsește schimbări, cron-ul zilnic reîncearcă). O eroare
+        # REALĂ (bug de script, eroare de scriere) iese non-zero → vizibilă în
+        # Actions, nu mascată ca warning (același principiu ca storage-capture).
+        run: python3 scripts/convert-sen.py --capture-prices
+
+      - name: Commit updated price data (if any)
+        run: |
+          if git diff --quiet -- data/sen-prices.json; then
+            echo "No changes — price data already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Rebase înainte de commit: cron-ul poate suprapune alte workflow-uri
+          # (data-refresh, storage-capture) care împing pe aceeași ramură — fără
+          # pull, push-ul ar fi respins ca non-fast-forward. Push-ul are retry.
+          BRANCH="${GITHUB_REF_NAME:-main}"
+          git pull --rebase --autostash origin "$BRANCH" || {
+            echo "::error::rebase a eșuat — prețurile NU au fost persistate (vizibil în Actions; cron-ul reia mâine)"
+            git rebase --abort 2>/dev/null || true
+            exit 1
+          }
+          git add data/sen-prices.json
+          if git diff --cached --quiet; then
+            echo "Nothing to commit — price data already up to date."
+            exit 0
+          fi
+          if ! git commit -m "chore(data): capture PZU (OPCOM) day-ahead prices"; then
+            echo "::error::commit a eșuat cu schimbări staged — prețurile NU sunt persistate (vizibil în Actions)"
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed price capture (attempt $attempt/3)."
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::push respins (încercarea $attempt/3) — rebase + reîncerc"
+              git pull --rebase --autostash origin "$BRANCH" || {
+                echo "::error::rebase a eșuat la retry — prețurile NU au fost persistate (vizibil în Actions)"
+                git rebase --abort 2>/dev/null || true
+                exit 1
+              }
+              sleep 5
+            fi
+          done
+          echo "::error::push a eșuat după 3 încercări — prețurile NU au fost persistate (vizibil în Actions; cron-ul reia mâine)"
+          exit 1

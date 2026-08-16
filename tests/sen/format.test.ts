@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  customRangeToBoundaries,
   dataAgeMs,
   formatAxisTick,
   formatDate,
@@ -9,6 +10,7 @@ import {
   formatMW,
   formatNumber,
   formatPercent,
+  formatRangeLabel,
   formatRelative,
   formatSigned,
   formatSold,
@@ -246,6 +248,67 @@ describe("formatLastUpdatedLabel", () => {
 
   it("returns the base label without trailing whitespace for empty relative", () => {
     expect(formatLastUpdatedLabel("")).toBe("Ultima înregistrare, actualizată");
+  });
+});
+
+describe("formatRangeLabel", () => {
+  const day = 24 * 3_600_000;
+
+  it("formats a multi-day range as 'd1–d2 month'", () => {
+    // 8 aug 00:00 UTC → 15 aug 00:00 UTC (7 zile)
+    const from = Date.UTC(2026, 7, 8, 0, 0, 0);
+    expect(formatRangeLabel(from, from + 7 * day)).toBe("8–15 aug 2026");
+  });
+
+  it("formats a sub-day range with times", () => {
+    // 8 aug 18:07 UTC → 9 aug 06:07 UTC (< 24h, zile diferite)
+    const from = Date.UTC(2026, 7, 8, 18, 7, 0);
+    expect(formatRangeLabel(from, from + 12 * 3_600_000)).toBe("8 aug 18:07 – 9 aug 06:07");
+  });
+
+  it("formats a same-day sub-day range with only times on the right", () => {
+    const from = Date.UTC(2026, 7, 8, 0, 0, 0);
+    expect(formatRangeLabel(from, from + 6 * 3_600_000)).toBe("8 aug 00:00 – 06:00");
+  });
+
+  it("is independent of the system timezone (UTC getters)", () => {
+    const from = Date.UTC(2026, 7, 8, 0, 0, 0);
+    expect(formatRangeLabel(from, from + 7 * day)).toBe("8–15 aug 2026");
+  });
+});
+
+describe("customRangeToBoundaries (interval personalizat → granițe UTC clampate)", () => {
+  // Datele disponibile: 1 iul – 15 aug 2026 (ca summary real).
+  const startTs = Date.UTC(2026, 6, 1, 0, 0, 0);
+  const endTs = Date.UTC(2026, 7, 15, 23, 59, 59, 999);
+
+  it("ziua aleasă = zi întreagă în granițe UTC (00:00 → 23:59:59.999)", () => {
+    const r = customRangeToBoundaries({ from: "2026-08-10", to: "2026-08-14" }, startTs, endTs);
+    expect(r).toEqual({
+      from: Date.UTC(2026, 7, 10, 0, 0, 0),
+      to: Date.UTC(2026, 7, 14, 23, 59, 59, 999),
+    });
+  });
+
+  it("clamp la datele disponibile (start/end ale seriei)", () => {
+    const r = customRangeToBoundaries({ from: "2026-06-01", to: "2026-09-30" }, startTs, endTs);
+    expect(r).toEqual({ from: startTs, to: endTs });
+  });
+
+  it("null pentru undefined / date invalide / from > to", () => {
+    expect(customRangeToBoundaries(undefined, startTs, endTs)).toBeNull();
+    expect(
+      customRangeToBoundaries({ from: "garbage", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+    expect(
+      customRangeToBoundaries({ from: "2026-08-14", to: "2026-08-10" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  it("zi de o singură zi: from = to (00:00 → 23:59:59.999)", () => {
+    const r = customRangeToBoundaries({ from: "2026-08-12", to: "2026-08-12" }, startTs, endTs);
+    expect(r!.from).toBe(Date.UTC(2026, 7, 12, 0, 0, 0));
+    expect(r!.to).toBe(Date.UTC(2026, 7, 12, 23, 59, 59, 999));
   });
 });
 

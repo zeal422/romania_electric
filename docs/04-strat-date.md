@@ -17,6 +17,8 @@ Acesta e **inima logicii proiectului**: funcții pure, tipizate, deterministe, a
 | [`live.ts`](../src/lib/sen/live.ts)           | Date live Transelectrica — **server-only**: parse/merge pure + fetch cu TTL 10 min + fallback la `liveCache` stale (max 24h) și date statice                                             |
 | [`storage.ts`](../src/lib/sen/storage.ts)     | Stocare (ISPOZ) — **server-only**: serie acumulată (cache singleton) + snapshot live `/sen-filter` cu TTL 3 min + fallback la ultima captură                                             |
 | [`instant.ts`](../src/lib/sen/instant.ts)     | Valori real-time (`/sen-filter`) — **server-only**: parser pur + fetch cu TTL 10s + backoff 30s + guard prospețime; la eșec → `null` (UI cade pe `summary.latest`)                       |
+| [`prices.ts`](../src/lib/sen/prices.ts)       | Prețuri PZU (OPCOM) — **server-only**: încarcă seria capturată din `data/sen-prices.json` (cache singleton, tolerant la lipsă/corupt)                                                    |
+| [`costs.ts`](../src/lib/sen/costs.ts)         | Costuri estimate — **pur**: `priceForHour`, `computeCosts` (cost = Σ MWh × preț orar), `intervalStats` + `bucketHours` (MW → MWh)                                                        |
 
 ## `types.ts` — tipurile cheie
 
@@ -70,12 +72,29 @@ Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci
 - `formatPercent(v, decimals?)`, `mwToGwh(mw, hours)`.
 - `formatDateTime(iso, {withYear?})` → `"8 aug, 18:07"`; `formatDate` → `"8 aug 2026"`; `formatTime` → `"18:07"`.
 - `formatAxisTick(ts, granularity)` → label de axă X pentru grafice (UTC): `"8 aug"` la `day`/`hour`, `"18:07"` la `raw`/`10m` — sursa unică pentru axele Recharts (folosit de `ProductionMixChart`, `DemandSupplyChart`, `BalanceChart`).
+- `formatRangeLabel(from, to)` → etichetă compactă de interval pentru footer-urile de card (ex: `"8–15 aug 2026"` la ≥ 24h, `"8 aug 18:07 – 9 aug 06:07"` sub 24h) — contextul explicit al valorilor din `ChartSummary` (pură, testată).
+- `customRangeToBoundaries(customRange, startTs, endTs)` → interval personalizat (calendar range) → granițe epoch clampate la datele disponibile: `from` = 00:00 al zilei de start, `to` = 23:59:59.999 al zilei de final (granițe UTC, contract fake-UTC); `null` pentru input invalid/`from > to` (apelantul cade pe preset). Extrasă din `page.tsx` (era închisă în componentă, netestabilă) — pură, testată (fix 0.3.26).
 - `dataAgeMs(iso, now)` → vârsta reală în **ms** a unei înregistrări față de `now` (baza de calcul a `formatRelative` și pragul de prospețime din UI); rezolvă instanța UTC reală a etichetei fake-UTC prin candidați `−2h`/`−3h` self-consistenți (`bucharestOffsetMs(candidat) === offset aplicat`), alegând cel mai recent candidat valid ≤ `now` — corect și la tranzițiile DST. `now` e obligatoriu (puritate §4.2).
 - `formatRelative(iso, now)` → `"acum 10 min"`, `"acum 2 ore"` — construit pe `dataAgeMs` (aceeași rezolvare a instanței reale); `now` e obligatoriu (fără default `Date.now()`, puritate §4.2) — corect și la tranzițiile DST (fix 0.3.19, refactor 0.3.22).
 - `formatLastUpdatedLabel(relative)` → eticheta de accesibilitate a badge-ului „ultima înregistrare" din Header: `"Ultima înregistrare, actualizată …"` (acord feminin).
 - `granularityLabel(g)` → eticheta RO a unei granularități.
 
 > **Important**: datele sursă sunt etichetate cu anul 2026 — le afișăm **fidel**, nu „corectăm” anul. **Valorile sursă sunt wall-clock (ora locală România, așa cum apar în fișierul Transelectrica), păstrate fidel — fără conversie EET/EEST — și etichetate ca UTC în ISO.** Funcțiile de formatare (`formatDateTime`, `formatDate`, `formatTime`) folosesc **getters UTC** (`getUTCHours`, `timeZone: "UTC"`) — nu înlocui cu getters locale, ar schimba ora afișată pe sisteme non-UTC.
+
+## `costs.ts` — costuri estimate (pure)
+
+- `bucketHours(ts, granularity)` — durata unui bucket în ore (1h la `hour`, 10/60 la `10m`/`raw`, 24 la `day`) pentru conversia MW → MWh (getters UTC, contract de timp).
+- `priceForHour(day, hour)` — prețul PZU (EUR/MWh) pentru ora wall-clock `hour` (0-23) dintr-un `PriceDay`; `undefined` dacă ziua lipsește sau ora e în afara array-ului. **Aliniere**: OPCOM pune intervalul de livrare N = ora N−1, deci indexăm direct `prices[hour]` (contract fake-UTC). **Limitare cunoscută**: pe zilele DST (23/25 intervale) indexarea directă poate fi decalată cu o oră după ora sărită — 2 zile/an, cifra e oricum o estimare etichetată; se rezolvă cu date reale când se apropie octombrie.
+- `computeCosts(points, priceDays, granularity)` → `CostsSummary`: `importMWh`/`exportMWh` (Σ sold × ore, pe orele cu preț), `cost` = Σ importMWh × preț, `revenue` = Σ exportMWh × preț, `net = cost − revenue`, `coveredHours`/`totalHours`, `hasPrices`. `totalHours` numără **ore unice** din interval (cheie = indicele UTC de oră, `Math.floor(ts / 3_600_000)` — la granularități sub-orare dedupează duplicatele; cheia veche „zi×24+oră" colida la granița de lună, fix 0.3.26), nu zile; `coveredHours` numără orele cu preț aplicat. **Orele fără preț sunt excluse din cost** (fallback onest) dar numărate la `totalHours`; `hasPrices = false` → cardul afișează „prețuri indisponibile", nu zerouri.
+- `intervalStats(points)` → `{avgConsum, avgProductie, peakConsum}` pentru footer-ul „Consum vs. Producție" (fără prețuri).
+
+> **Estimare, nu cost final**: prețurile PZU sunt cele day-ahead; costul real include și intraday + echilibrare (nu publice în timp real). UI-ul afișează explicit eticheta „estimare bazată pe prețurile PZU".
+
+## `prices.ts` — prețuri PZU (server-only)
+
+- `loadPriceDays()` / `getPriceDays()` — seria capturată din `data/sen-prices.json` (cache singleton, sortată pe dată); fișier lipsă/corupt → listă goală (NU 500, site-ul nu se rupe). Nu cache-uiește eșecul (fișierul poate apărea după prima rulare a workflow-ului `price-capture`).
+- `resetPricesCache()` — invalidare (teste).
+- ⚠️ **Doar server** (folosește `node:fs`). Nu importa în componente client.
 
 ## `storage.ts` — stocare (ISPOZ, server-only)
 
@@ -99,6 +118,10 @@ Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci
 - `resetInstantCache()` — invalidare (teste).
 - ⚠️ **Doar server** (folosește `fetch` server-side). Nu importa în componente client.
 
+## `tooltip.ts` — logica pură a rândurilor de tooltip (fără DOM)
+
+- `buildTooltipRows(payload, {labels, unit, showTotals, hideZero, hideKeys})` → rândurile gata de afișat (key/name/value/color/unit): filtrează intrările nenumerice, mapează numele prin `labels`, aplică excluderile (`showTotals` exclude consumul duplicat, `hideZero` ascunde rândurile cu 0 — seriile de fill clamate ale balanței, `hideKeys` ascunde seriile după cheie — fill-urile de gradient) și sortează descrescător după valoare. Extrasă din `ChartTooltip` (fix 0.3.26: `tooltipType="none"` nu filtrează cu content custom în recharts 2.15 → excluderea explicită e singura cale robustă). Pură, testabilă fără RTL (model `buildLegendRows`).
+
 ## `loader.ts` — citire date (server-only)
 
 - `loadReadings()` / `loadSummary()` — cache singleton (un singur `readFile` per proces).
@@ -108,7 +131,7 @@ Toate sunt **pure și deterministe** — ideal pentru teste (vezi [07-testing-ci
 
 ## Cum testezi
 
-- Testele sunt în `tests/sen/*.test.ts` (+ `tests/storage.test.ts` + `tests/capture-storage.test.ts`) și acoperă `aggregate`, `stats`, `format`, `live`, `instant`, `storage` și logica Python de captură (`--capture-storage`).
+- Testele sunt în `tests/sen/*.test.ts` (+ `tests/storage.test.ts` + `tests/capture-storage.test.ts` + `tests/capture-prices.test.ts`) și acoperă `aggregate`, `stats`, `format`, `live`, `instant`, `storage`, `costs` și logica Python de captură (`--capture-storage`, `--capture-prices`).
 - După modificări în aceste fișiere, rulează `bun test` + `bun run typecheck`.
 - Dacă ai modificat codul (sau documentația), actualizează documentele acoperite de modificare și rulează `bun run docs:mark-verified` ca să le marchezi ca fiind la zi.
 - Verificarea finală: `bun run check` întreg (format → docs → lint → typecheck → teste → build).

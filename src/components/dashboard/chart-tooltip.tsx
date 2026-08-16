@@ -4,16 +4,9 @@ import type { TooltipProps } from "recharts";
 
 import { useHoverStore } from "@/hooks/use-hover-store";
 import { formatDateTime, formatNumber } from "@/lib/sen/format";
+import { buildTooltipRows } from "@/lib/sen/tooltip";
 
 import type { AggregatedPoint } from "@/lib/sen/types";
-
-interface Row {
-  key: string;
-  name: string;
-  value: number;
-  color: string;
-  unit?: string;
-}
 
 interface ChartTooltipProps extends TooltipProps<number, string> {
   /** Mapare nume serie -> etichetă afișată. */
@@ -22,6 +15,13 @@ interface ChartTooltipProps extends TooltipProps<number, string> {
   unit?: string;
   /** Afișează sumarul total de producție/consum în antet. */
   showTotals?: boolean;
+  /** Ascunde rândurile cu valoare 0 (ex: balanța — seriile de fill au zerouri
+   *  intenționate la valorile de pe celălalt semn). */
+  hideZero?: boolean;
+  /** Ascunde seriile după cheie (ex: balanța — seriile de fill pentru gradient,
+   *  care nu trebuie să apară niciodată în tooltip; recharts nu le filtrează
+   *  cu tooltipType="none" când conținutul e custom). */
+  hideKeys?: string[];
   /** Formatare personalizată pentru eticheta de timp. */
   labelFormatter?: (label: unknown) => string;
 }
@@ -38,6 +38,8 @@ export function ChartTooltip({
   labels,
   unit = "MW",
   showTotals = false,
+  hideZero = false,
+  hideKeys,
   labelFormatter,
 }: ChartTooltipProps) {
   const { hoveredSource } = useHoverStore();
@@ -46,21 +48,15 @@ export function ChartTooltip({
 
   const dataPoint = payload[0]?.payload as AggregatedPoint | undefined;
 
-  const rows: Row[] = payload
-    .filter((p) => typeof p.value === "number")
-    .map((p) => {
-      const key = String(p.dataKey ?? p.name);
-      const name = labels?.[key] ?? p.name ?? key;
-      return {
-        key,
-        name,
-        value: p.value as number,
-        color: (p.color as string) ?? "var(--primary)",
-        unit,
-      };
-    })
-    .filter((r) => !(showTotals && r.key === "consum"))
-    .sort((a, b) => b.value - a.value);
+  // Logica de filtrare/sortare/mapare e în funcția pură buildTooltipRows
+  // (src/lib/sen/tooltip.ts) — testată separat, model buildLegendRows.
+  const rows = buildTooltipRows(payload, {
+    labels,
+    unit,
+    showTotals,
+    hideZero,
+    hideKeys,
+  });
 
   const formattedLabel = formatLabel(label, labelFormatter);
 

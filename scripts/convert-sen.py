@@ -40,6 +40,14 @@ OUT_SUMMARY = os.path.join(OUT_DIR, "sen-summary.json")
 # Overridable prin env pentru teste (fișiere temporare), ca să nu atingem niciodată
 # datele reale din repo: SEN_STORAGE_URL (endpoint mock) + SEN_STORAGE_OUT (fișier temp).
 OUT_STORAGE = os.environ.get("SEN_STORAGE_OUT", os.path.join(OUT_DIR, "sen-storage.json"))
+# Prețurile PZU (OPCOM): SEN_PRICES_OUT (fișier temp pt teste) + template-ul de URL
+# (endpoint public, fără cheie) + backfill-days overridable pt teste (mock server).
+OUT_PRICES = os.environ.get("SEN_PRICES_OUT", os.path.join(OUT_DIR, "sen-prices.json"))
+PRICES_URL_TEMPLATE = os.environ.get(
+    "SEN_PRICES_URL_TEMPLATE",
+    "https://www.opcom.ro/rapoarte-pzu-raportPIP-export-csv/{day}/{month}/{year}/en?resolution=60",
+)
+PRICES_BACKFILL_DAYS = int(os.environ.get("SEN_PRICES_BACKFILL_DAYS", "35"))
 
 # Ordinea coloanelor din xlsx (header: …;Carbune;Hidrocarburi;Ape;Nuclear;Eolian;Foto;Biomasa;Sold).
 FIELDS = [
@@ -450,6 +458,162 @@ def capture_storage():
     print(f"Wrote {OUT_STORAGE} ({len(merged)} points, latest ispoz={ispoz} MW)", file=sys.stderr)
 
 
+import csv as _csv
+
+
+def load_existing_prices():
+    """Încarcă seria existentă de prețuri din OUT_PRICES; tolerantă la lipsă/corupt/non-list.
+
+    Returnează o listă (goală dacă fișierul nu există, e JSON invalid sau nu e
+    o listă — nu aruncă niciodată), fără validare profundă a fiecărui record
+    (merge_prices face curățarea la scriere).
+    """
+    if not os.path.exists(OUT_PRICES):
+        return []
+    try:
+        with open(OUT_PRICES, encoding="utf-8") as f:
+            existing = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[capture_prices] fișier corupt ({e}) — pornesc de la zero", file=sys.stderr)
+        return []
+    if not isinstance(existing, list):
+        print(
+            f"[capture_prices] structură neașteptată în {OUT_PRICES} — pornesc de la zero",
+            file=sys.stderr,
+        )
+        return []
+    return existing
+
+
+def parse_prices_csv(text: str):
+    """Parsează CSV-ul OPCOM (PZU, raport PIP) într-o listă de prețuri orare.
+
+    Format real (verificat live): header `Interval,Average Price [Euro/MWh],Resolution`,
+    apoi un rând per interval de livrare — 24 în zilele normale, 23 la trecerea
+    la ora de vară (martie), 25 la trecerea la ora de iarnă (octombrie).
+    Returnează lista de prețuri (float) în ordinea intervalelor 1..N sau None
+    dacă payload-ul e gol / header-ul lipsă / vreun preț e ne-parseabil.
+    """
+    rows = list(_csv.DictReader(text.splitlines()))
+    if not rows:
+        return None
+    if "Average Price [Euro/MWh]" not in rows[0]:
+        return None
+    prices = []
+    for row in rows:
+        raw = (row.get("Average Price [Euro/MWh]") or "").strip()
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(v):
+            return None
+        prices.append(v)
+    return prices if prices else None
+
+
+def fetch_prices_day(date: datetime):
+    """Descarcă prețurile PZU pentru o zi calendaristică dată (wall-clock RO).
+
+    Returnează un dict {"date", "prices", "currency"} sau None dacă payload-ul
+    e gol (zi fără date publicate — de ex. viitoare), eșec de rețea sau CSV
+    ne-parseabil. Fără să arunce — fallback silențios, workflow-ul reia.
+    """
+    url = PRICES_URL_TEMPLATE.format(
+        day=f"{date.day:02d}",
+        month=f"{date.month:02d}",
+        year=f"{date.year:04d}",
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            text = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.URLError as e:
+        print(f"[capture_prices] eșec de rețea la {date.date()}: {e} — sar peste zi", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(
+            f"[capture_prices] eroare neașteptată la {date.date()}: {e} — sar peste zi",
+            file=sys.stderr,
+        )
+        return None
+
+    prices = parse_prices_csv(text)
+    if prices is None:
+        # Payload gol (zi viitoare / nedisponibilă) sau format neașteptat — skip.
+        print(f"[capture_prices] {date.date()}: payload gol sau ne-parseabil — skip", file=sys.stderr)
+        return None
+    return {
+        "date": date.strftime("%Y-%m-%d"),
+        "prices": prices,
+        "currency": "EUR",
+    }
+
+
+def merge_prices(existing, day):
+    """Merge o zi de prețuri în seria existentă, cu dedupe/suprascriere pe `date`.
+
+    Returnează (merged, changed):
+    - merged: lista deduplicată pe `date` (ziua nouă o suprascrie pe cea veche)
+      și sortată ascendent după dată;
+    - changed: True dacă ziua aduce o valoare nouă (zi nouă SAU prețuri diferite
+      la aceeași dată — OPCOM poate publica prețuri revizuite).
+    """
+    by_date = {}
+    for r in existing:
+        if isinstance(r, dict) and "date" in r and isinstance(r.get("prices"), list):
+            by_date[r["date"]] = r
+    prev = by_date.get(day["date"])
+    changed = prev is None or prev.get("prices") != day["prices"]
+    by_date[day["date"]] = day
+    merged = sorted(by_date.values(), key=lambda x: x["date"])
+    return merged, changed
+
+
+def capture_prices():
+    """Modul --capture-prices: descarcă prețurile PZU (OPCOM) pentru ultimele zile.
+
+    Prețurile day-ahead (PZU) sunt publice pe opcom.ro ca export CSV per zi de
+    livrare (fără cheie, fără înregistrare — la fel cum Transelectrica expune
+    widget-ul SEN). La fiecare rulare (zilnic, prin workflow-ul price-capture.yml)
+    descărcăm ultimele PRICES_BACKFILL_DAYS zile și le scriem cu dedupe pe dată
+    în data/sen-prices.json: [{"date", "prices": [...], "currency": "EUR"}].
+
+    Backfill-ul larg (35 zile) e intenționat: acoperă preset-ul de 30 de zile al
+    dashboard-ului + marjă, e indempotent (suprascrie aceleași date) și e ieftin
+    (~35 requesturi mici de ~600B pe rulare zilnică).
+
+    Fallback silențios la eșec de rețea / zi fără date (datele existente rămân);
+    un eșec REAL (eroare de scriere) iese non-zero → vizibil în Actions.
+    """
+    os.makedirs(os.path.dirname(OUT_PRICES) or ".", exist_ok=True)
+
+    existing = load_existing_prices()
+    today = datetime.now(TZ_RO)
+    merged = list(existing)
+    changed_any = False
+
+    for offset in range(PRICES_BACKFILL_DAYS):
+        day = today - timedelta(days=offset)
+        rec = fetch_prices_day(day)
+        if rec is None:
+            continue
+        merged, changed = merge_prices(merged, rec)
+        if changed:
+            changed_any = True
+
+    if not changed_any:
+        print("No new prices — data already up to date.", file=sys.stderr)
+        return
+
+    with open(OUT_PRICES, "w", encoding="utf-8") as f:
+        json.dump(merged, f, separators=(",", ":"))
+    print(
+        f"Wrote {OUT_PRICES} ({len(merged)} days, latest {merged[-1]['date'] if merged else '-'})",
+        file=sys.stderr,
+    )
+
+
 def convert_from_xlsx():
     """Modul implicit (data:convert): rebuild complet din upload/Grafic_SEN.xlsx."""
     import openpyxl  # lazy: necesar doar pentru modul xlsx (--fetch e stdlib-only)
@@ -486,6 +650,8 @@ def convert_from_xlsx():
 if __name__ == "__main__":
     if "--capture-storage" in sys.argv:
         capture_storage()
+    elif "--capture-prices" in sys.argv:
+        capture_prices()
     elif "--fetch" in sys.argv:
         refresh_from_live()
     else:

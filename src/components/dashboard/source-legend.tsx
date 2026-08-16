@@ -1,7 +1,7 @@
 "use client";
 
 import { useHoverStore } from "@/hooks/use-hover-store";
-import { SOURCES } from "@/lib/sen/constants";
+import { SERIES_COLORS, SOURCES } from "@/lib/sen/constants";
 import type { SourceField } from "@/lib/sen/types";
 
 interface SourceLegendProps {
@@ -41,6 +41,17 @@ export function SourceLegend({ sortedSources }: SourceLegendProps) {
           </button>
         );
       })}
+      {/* Consum: nu e o sursă (nu are hover pe arii), deci e un element static,
+          nu un buton — dar stă în aceeași legendă, ca restul seriilor. Linia
+          punctată cu culoarea seriei (SERIES_COLORS.consum). */}
+      <span className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs">
+        <span
+          className="inline-block h-0 w-2.5 border-t-2"
+          style={{ borderColor: SERIES_COLORS.consum, borderStyle: "dashed" }}
+          aria-hidden
+        />
+        <span className="text-muted-foreground">Consum</span>
+      </span>
     </div>
   );
 }

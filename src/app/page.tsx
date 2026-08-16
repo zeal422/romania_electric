@@ -4,6 +4,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
 import { BalanceChart } from "@/components/dashboard/balance-chart";
+import { ChartSummary } from "@/components/dashboard/chart-summary";
 import { DataTable } from "@/components/dashboard/data-table";
 import { DemandSupplyChart } from "@/components/dashboard/demand-supply-chart";
 import { Filters, RANGE_PRESETS } from "@/components/dashboard/filters";
@@ -12,6 +13,7 @@ import { GlobalHoverSync } from "@/components/dashboard/global-hover-sync";
 import { Header } from "@/components/dashboard/header";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { ProductionMixChart } from "@/components/dashboard/production-mix-chart";
+import { RangePicker } from "@/components/dashboard/range-picker";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { SourceDistribution } from "@/components/dashboard/source-distribution";
 import { SourceLegend } from "@/components/dashboard/source-legend";
@@ -20,9 +22,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInstantData } from "@/hooks/use-instant-data";
 import { useLocalPreference } from "@/hooks/use-local-preference";
+import { useSenCosts } from "@/hooks/use-sen-costs";
 import { useSenData, useSenSummary } from "@/hooks/use-sen-data";
+import { intervalStats } from "@/lib/sen/costs";
 import { SOURCE_ORDER } from "@/lib/sen/constants";
-import { formatNumber } from "@/lib/sen/format";
+import {
+  customRangeToBoundaries,
+  formatEurMillions,
+  formatNumber,
+  formatRangeLabel,
+} from "@/lib/sen/format";
 import {
   GRANULARITIES,
   granularitiesForPreset,
@@ -31,6 +40,23 @@ import {
 } from "@/lib/sen/types";
 
 const PRESET_IDS = RANGE_PRESETS.map((p) => p.id);
+
+/** Interval personalizat ales din calendar (ISO date, YYYY-MM-DD). */
+interface CustomRange {
+  from: string;
+  to: string;
+}
+
+const isDateStr = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+// useLocalPreference cere `T extends string` — stocăm intervalul serializat
+// („YYYY-MM-DD|YYYY-MM-DD") și îl parsam la citire.
+const CUSTOM_RANGE_SERIALIZED = (r: CustomRange | undefined) => (r ? `${r.from}|${r.to}` : "");
+const parseCustomRange = (s: string): CustomRange | undefined => {
+  const [from, to] = s.split("|");
+  if (from && to && isDateStr(from) && isDateStr(to)) return { from, to };
+  return undefined;
+};
 
 // Validatori stabili la nivel de modul: `isValid` trebuie să fie aceeași
 // referință între randări ca `getSnapshot` (useCallback) să nu se recreeze
@@ -58,6 +84,13 @@ export default function Home() {
     "hour",
     isGranularity,
   );
+  // Interval personalizat (calendar): persistă serializat („YYYY-MM-DD|YYYY-MM-DD").
+  const [customRangeRaw, setCustomRangeRaw] = useLocalPreference<string>(
+    "sen:custom-range",
+    "",
+    (v: string): v is string => v === "" || parseCustomRange(v) !== undefined,
+  );
+  const customRange = useMemo(() => parseCustomRange(customRangeRaw), [customRangeRaw]);
 
   const sortedSources = useMemo(() => {
     if (!summary?.latest) return SOURCE_ORDER;
@@ -109,21 +142,87 @@ export default function Home() {
   /** Schimbă preset-ul de interval, ajustând granularitatea dacă e incompatibilă. */
   function handlePresetChange(preset: string) {
     setActivePreset(preset);
+    if (preset === "custom") return; // granularitatea rămâne ce e (utilizatorul alege)
     // 24h e prea scurt pentru zi; interval mare e prea dens pentru raw/10m
     setGranularity(resolveGranularity(preset, granularity));
   }
 
+  /** Interval personalizat ales din calendar: salvează + trece pe preset-ul „custom". */
+  function handleCustomRangeChange(fromTs: number, toTs: number) {
+    const d1 = new Date(fromTs);
+    const d2 = new Date(toTs);
+    const iso = (d: Date) =>
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+        d.getUTCDate(),
+      ).padStart(2, "0")}`;
+    setCustomRangeRaw(CUSTOM_RANGE_SERIALIZED({ from: iso(d1), to: iso(d2) }));
+    setActivePreset("custom");
+  }
+
   const { from, to } = useMemo(() => {
     if (!endTs) return { from: 0, to: 0 };
+    if (activePreset === "custom") {
+      // Granițe UTC (contract fake-UTC): ziua aleasă = [00:00, 23:59:59.999],
+      // clampate la datele disponibile — logica pură în format.ts (testată).
+      const bounds = customRangeToBoundaries(customRange, startTs, endTs);
+      if (bounds) return bounds;
+    }
     const preset = RANGE_PRESETS.find((p) => p.id === activePreset) ?? RANGE_PRESETS[2];
     const fromTs = preset.msBack === null ? startTs : Math.max(startTs, endTs - preset.msBack);
     return { from: fromTs, to: endTs };
-  }, [activePreset, endTs, startTs]);
+  }, [activePreset, customRange, endTs, startTs]);
 
   const dataQuery = useSenData(from || undefined, to || undefined, effectiveGranularity);
   const points = dataQuery.data?.points ?? [];
+  const costsQuery = useSenCosts(from || undefined, to || undefined);
+  const costs = costsQuery.data?.costs;
 
   const renewableShare = dataQuery.data?.summary.renewableShareAvg;
+
+  // Footer „Consum vs. Producție”: statistici simple pe interval, calculate din
+  // punctele deja încărcate (fără prețuri) — păstrează simetria cu cardul
+  // „Balanța” (care primește costurile) în grid-ul lg:grid-cols-2.
+  const chartStats = useMemo(() => intervalStats(points), [points]);
+
+  // Contextul perioadei pentru footer-urile celor două carduri: eticheta
+  // preset-ului activ (ex: „7 zile”) + intervalul real (ex: „8–15 aug”). Fără
+  // acest rând, valorile (costuri / medii) nu au un termen de referință clar.
+  const rangeContext = useMemo(() => {
+    if (!endTs) return undefined;
+    const preset = RANGE_PRESETS.find((p) => p.id === activePreset) ?? RANGE_PRESETS[2];
+    const presetLabel =
+      activePreset === "all"
+        ? "Tot intervalul"
+        : activePreset === "custom"
+          ? "Personalizat"
+          : `Ultimele ${preset.label.toLowerCase()}`;
+    return `${presetLabel} · ${formatRangeLabel(from, to)}`;
+  }, [activePreset, endTs, from, to]);
+
+  // Eticheta compactă pentru selectorul de perioadă din header-ul cardurilor:
+  // preset-urile afișează numele scurt („7 zile”), intervalul personalizat
+  // afișează datele reale („9–13 aug 2026”).
+  const rangePickerLabel = useMemo(() => {
+    if (activePreset === "custom" && from > 0 && to > 0) return formatRangeLabel(from, to);
+    const preset = RANGE_PRESETS.find((p) => p.id === activePreset) ?? RANGE_PRESETS[2];
+    return preset.label;
+  }, [activePreset, from, to]);
+
+  // Selector de perioadă partajat de cele două carduri pereche (Consum vs
+  // Producție + Balanța) — același handler ca bara de filtre, deci starea e
+  // sincronă oriunde schimbi intervalul.
+  const rangePickerActions = summary ? (
+    <RangePicker
+      activePreset={activePreset}
+      from={from}
+      to={to}
+      startTs={startTs}
+      endTs={endTs}
+      label={rangePickerLabel}
+      onPresetChange={handlePresetChange}
+      onCustomRangeChange={handleCustomRangeChange}
+    />
+  ) : undefined;
 
   return (
     <div className="bg-aura-light dark:bg-aura-dark flex min-h-screen flex-col bg-background">
@@ -147,6 +246,7 @@ export default function Home() {
               granularity={effectiveGranularity}
               onPresetChange={handlePresetChange}
               onGranularityChange={setGranularity}
+              onCustomRangeChange={handleCustomRangeChange}
               from={from}
               to={to}
             />
@@ -175,6 +275,10 @@ export default function Home() {
             subtitle="Mixul de producție (arie stivuită) vs. consum (linie punctată)"
             className="lg:col-span-2"
             chartHeight={360}
+            // Se întinde să umple rândul (min-height 360, crește când coloana
+            // laterală Mixul curent + Stocare e mai înaltă) — altfel ar rămâne
+            // la 360px fix cu gol dedesubt.
+            stretch
           >
             {dataQuery.isLoading ? (
               <ChartSkeleton />
@@ -209,6 +313,26 @@ export default function Home() {
             title="Consum vs. Producție"
             subtitle="Cererea și oferta de energie în intervalul selectat"
             chartHeight={300}
+            actions={rangePickerActions}
+            footer={
+              <ChartSummary
+                title={rangeContext}
+                cells={[
+                  {
+                    label: "Media consum",
+                    value: `${formatNumber(chartStats.avgConsum)} MW`,
+                  },
+                  {
+                    label: "Media producție",
+                    value: `${formatNumber(chartStats.avgProductie)} MW`,
+                  },
+                  {
+                    label: "Vârf consum",
+                    value: `${formatNumber(chartStats.peakConsum)} MW`,
+                  },
+                ]}
+              />
+            }
           >
             {dataQuery.isLoading ? (
               <ChartSkeleton />
@@ -223,6 +347,39 @@ export default function Home() {
             title="Balanța energetică (Sold)"
             subtitle="Pozitiv = import · Negativ = export"
             chartHeight={300}
+            actions={rangePickerActions}
+            footer={
+              <ChartSummary
+                title={rangeContext}
+                cells={
+                  costs === undefined || !costs.hasPrices
+                    ? [
+                        { label: "Cost import", value: "—" },
+                        { label: "Venit export", value: "—" },
+                        { label: "Sold net", value: "—" },
+                      ]
+                    : [
+                        {
+                          label: "Cost import",
+                          value: formatEurMillions(costs.cost),
+                        },
+                        {
+                          label: "Venit export",
+                          value: formatEurMillions(costs.revenue),
+                        },
+                        {
+                          label: "Sold net",
+                          value: formatEurMillions(costs.net),
+                        },
+                      ]
+                }
+                note={
+                  costs !== undefined && !costs.hasPrices
+                    ? "Prețuri PZU indisponibile pentru acest interval — afișăm doar volumele."
+                    : "Estimare bazată pe prețurile PZU (day-ahead); costul real include intraday și echilibrare."
+                }
+              />
+            }
           >
             {dataQuery.isLoading ? (
               <ChartSkeleton />
