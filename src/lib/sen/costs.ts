@@ -45,7 +45,8 @@ export function bucketHours(ts: number, granularity: Granularity): number {
  * `hour` = 0..23 (getUTCHours al unui punct — contract fake-UTC). Indexăm
  * `prices[hour]` pentru că OPCOM pune intervalul de livrare N = ora N−1.
  * Returnează undefined dacă ziua lipsește sau ora e în afara array-ului
- * (de ex. la DST, când ziua are 23 de intervale și o oră nu există fizic).
+ * (defensiv — captura stochează DOAR zile cu 24 de intervale; zilele DST
+ * cu 23/25 sunt respinse la parse, fix 0.3.27).
  */
 export function priceForHour(day: PriceDay | undefined, hour: number): number | undefined {
   if (!day) return undefined;
@@ -76,11 +77,13 @@ export function computeCosts(
   let exportMWh = 0;
   let cost = 0;
   let revenue = 0;
-  let coveredHours = 0;
-  // Ore unice prezente în interval (cheie zi×24+ora) — `totalHours` trebuie să
-  // numere ORE, nu zile. Un punct per bucket orar ⇒ fiecare punct e o oră;
-  // dedup-ul protejează la granularități sub-orare (10m/raw).
+  // Ore unice prezente în interval — `totalHours` trebuie să numere ORE, nu
+  // zile. Un punct per bucket orar ⇒ fiecare punct e o oră; dedup-ul protejează
+  // la granularități sub-orare (10m/raw).
   const hourKeys = new Set<number>();
+  // Ore unice CU preț aplicat — `coveredHours` numără ORE, nu puncte (fix
+  // 0.3.27: la 10m/raw sunt 6 puncte pe oră; per-punct ar depăși totalHours).
+  const coveredHourKeys = new Set<number>();
 
   for (const p of points) {
     // Contract de timp: t e wall-clock RO etichetat UTC, deci getUTCHours +
@@ -98,13 +101,13 @@ export function computeCosts(
     hourKeys.add(hourKey);
 
     if (price !== undefined) {
-      coveredHours += 1;
+      coveredHourKeys.add(hourKey);
       if (p.sold > 0) {
-        const mwh = (p.sold * hours) / 1; // MW × h = MWh
+        const mwh = p.sold * hours; // MW × h = MWh
         importMWh += mwh;
         cost += mwh * price;
       } else if (p.sold < 0) {
-        const mwh = (-p.sold * hours) / 1;
+        const mwh = -p.sold * hours;
         exportMWh += mwh;
         revenue += mwh * price;
       }
@@ -117,9 +120,9 @@ export function computeCosts(
     cost,
     revenue,
     net: cost - revenue,
-    coveredHours,
+    coveredHours: coveredHourKeys.size,
     totalHours: hourKeys.size,
-    hasPrices: coveredHours > 0,
+    hasPrices: coveredHourKeys.size > 0,
   };
 }
 

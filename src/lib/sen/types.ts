@@ -173,11 +173,11 @@ export interface InstantData {
  *
  * Contract de timp: `date` e ziua calendaristică wall-clock România
  * (YYYY-MM-DD), iar `prices[i]` e prețul mediu al intervalului de livrare
- * `i+1` (adică ora wall-clock RO `i:00–i+1:00`) în EUR/MWh. Numărul de
- * intervale e 24 în zilele normale, 23 la trecerea la ora de vară (ora
- * 02:00–03:00 nu există) și 25 la trecerea la ora de iarnă (ora 02:00–03:00
- * apare de două ori) — alinierea se face prin `getUTCHours` (contract
- * fake-UTC, vezi format.ts/aggregate.ts), fără conversii EET/EEST.
+ * `i+1` (adică ora wall-clock RO `i:00–i+1:00`) în EUR/MWh. Captura stochează
+ * DOAR zile cu 24 de intervale: zilele DST cu 23/25 de intervale sunt sărite
+ * la parse (prețurile ar fi decalate altfel — `priceForHour` indexează
+ * `prices[hour]` pozițional; contract fake-UTC, vezi format.ts/aggregate.ts),
+ * fără conversii EET/EEST.
  */
 export interface PriceDay {
   /** Ziua calendaristică de livrare (wall-clock RO), YYYY-MM-DD. */

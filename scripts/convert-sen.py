@@ -489,10 +489,14 @@ def parse_prices_csv(text: str):
     """Parsează CSV-ul OPCOM (PZU, raport PIP) într-o listă de prețuri orare.
 
     Format real (verificat live): header `Interval,Average Price [Euro/MWh],Resolution`,
-    apoi un rând per interval de livrare — 24 în zilele normale, 23 la trecerea
-    la ora de vară (martie), 25 la trecerea la ora de iarnă (octombrie).
-    Returnează lista de prețuri (float) în ordinea intervalelor 1..N sau None
-    dacă payload-ul e gol / header-ul lipsă / vreun preț e ne-parseabil.
+    apoi un rând per interval de livrare — DOAR 24 (zilele normale). Zilele DST
+    cu 23/25 de intervale sunt RESPINSE (return None): `priceForHour` indexează
+    `prices[hour]` pozițional, deci un număr diferit de intervale ar decala
+    prețurile cu o oră după ora sărită — mai bine „prețuri indisponibile" decât
+    prețuri greșite (decizie confirmată, fix 0.3.27).
+    Returnează lista de prețuri (float) în ordinea intervalelor 1..24 sau None
+    dacă payload-ul e gol / header-ul lipsă / vreun preț e ne-parseabil / numărul
+    de intervale ≠ 24.
     """
     rows = list(_csv.DictReader(text.splitlines()))
     if not rows:
@@ -509,7 +513,9 @@ def parse_prices_csv(text: str):
         if not math.isfinite(v):
             return None
         prices.append(v)
-    return prices if prices else None
+    if len(prices) != 24:
+        return None
+    return prices
 
 
 def fetch_prices_day(date: datetime):
@@ -550,6 +556,22 @@ def fetch_prices_day(date: datetime):
     }
 
 
+def _valid_price_record(r):
+    """True dacă un record de prețuri e valid pentru merge.
+
+    Respinge record-uri malformate care ar crăpa la sortare sau ar polua
+    data/sen-prices.json: date non-string (ex: None), prețuri ne-numerice sau
+    non-finite (NaN/Inf). Fără validare, sorted(key=lambda x: x["date"]) ar
+    arunca TypeError la date: None (fix TO_FIX F6).
+    """
+    return (
+        isinstance(r, dict)
+        and isinstance(r.get("date"), str)
+        and isinstance(r.get("prices"), list)
+        and all(isinstance(p, (int, float)) and math.isfinite(p) for p in r["prices"])
+    )
+
+
 def merge_prices(existing, day):
     """Merge o zi de prețuri în seria existentă, cu dedupe/suprascriere pe `date`.
 
@@ -558,10 +580,13 @@ def merge_prices(existing, day):
       și sortată ascendent după dată;
     - changed: True dacă ziua aduce o valoare nouă (zi nouă SAU prețuri diferite
       la aceeași dată — OPCOM poate publica prețuri revizuite).
+
+    Record-urile existente malformate sunt EXCLUSE (vezi `_valid_price_record`),
+    fără crash — nu blochează captura pentru datele valide.
     """
     by_date = {}
     for r in existing:
-        if isinstance(r, dict) and "date" in r and isinstance(r.get("prices"), list):
+        if _valid_price_record(r):
             by_date[r["date"]] = r
     prev = by_date.get(day["date"])
     changed = prev is None or prev.get("prices") != day["prices"]

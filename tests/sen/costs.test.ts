@@ -187,6 +187,21 @@ describe("computeCosts", () => {
     expect(r.cost).toBe(0);
     expect(r.revenue).toBe(0);
   });
+
+  it("coveredHours numără ORE unice, nu puncte (6 puncte/10min în aceeași oră = 1)", () => {
+    // 6 puncte de 10 minute în aceeași oră (20:00–20:50), toate cu preț.
+    // Bug real (fix 0.3.27): coveredHours += 1 per punct → 6, deși totalHours
+    // = 1 (o singură oră). Invariant: coveredHours ≤ totalHours.
+    const points = [0, 10, 20, 30, 40, 50].map((min) => {
+      const ts = Date.UTC(2026, 7, 14, 20, min, 0);
+      return { ...point(20, 600), ts, t: new Date(ts).toISOString() };
+    });
+    const r = computeCosts(points, [DAY], "10m");
+    expect(r.totalHours).toBe(1);
+    expect(r.coveredHours).toBe(1);
+    expect(r.importMWh).toBeCloseTo(600 * (10 / 60) * 6, 5); // 6 × 100 MWh
+    expect(r.hasPrices).toBe(true);
+  });
 });
 
 describe("intervalStats", () => {

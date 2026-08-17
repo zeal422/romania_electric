@@ -96,19 +96,44 @@ export function formatEurMillions(value: number, decimals = 2): string {
  * Extrasă din page.tsx (fix: logica de granițe UTC era închisă în componentă,
  * netestabilă). Pură și deterministă (AGENTS §4.2) — testabilă unitar.
  */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parse strict al unei date `YYYY-MM-DD` → miezul nopții UTC (epoch ms).
+ *
+ * Respinge date inexistente pe care `new Date(iso)` le normalizează silențios:
+ * ex. "2026-02-30" → 2 martie (roll-over în V8/JSC — verificat pe ambele
+ * runtime-uri) și luni invalide ("2026-13-01"). Folosește regex + round-trip
+ * prin `Date.UTC(y, m-1, d)` și verificarea câmpurilor UTC, pentru că
+ * `Number.isFinite` NU prinde ziua invalidă (epoch-ul e valid).
+ */
+function parseIsoDate(s: string): number | null {
+  if (!ISO_DATE_RE.test(s)) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  const ts = Date.UTC(y, m - 1, d);
+  const dt = new Date(ts);
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    return null;
+  }
+  return ts;
+}
+
 export function customRangeToBoundaries(
   customRange: { from: string; to: string } | undefined,
   startTs: number,
   endTs: number,
 ): { from: number; to: number } | null {
   if (!customRange) return null;
-  const fromIso = new Date(`${customRange.from}T00:00:00.000Z`).getTime();
-  const toIso = new Date(`${customRange.to}T23:59:59.999Z`).getTime();
-  if (!Number.isFinite(fromIso) || !Number.isFinite(toIso) || fromIso > toIso) return null;
-  return {
-    from: Math.max(startTs, fromIso),
-    to: Math.min(endTs, toIso),
-  };
+  const fromIso = parseIsoDate(customRange.from);
+  const toMidnight = parseIsoDate(customRange.to);
+  if (fromIso === null || toMidnight === null || fromIso > toMidnight) return null;
+  const toIso = toMidnight + 86_399_999; // 23:59:59.999
+  // Clamp la datele disponibile; dacă range-ul nu se suprapune deloc cu seria
+  // (integral înainte/după), clamp-ul inversează intervalul → null (fix 0.3.27).
+  const from = Math.max(startTs, fromIso);
+  const to = Math.min(endTs, toIso);
+  if (from > to) return null;
+  return { from, to };
 }
 
 /**

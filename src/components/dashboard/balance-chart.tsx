@@ -105,12 +105,13 @@ export function BalanceChart({ points, granularity }: BalanceChartProps) {
           content={
             <ChartTooltip
               labels={labels}
-              hideZero
               // Seriile de fill (import/export) există DOAR pentru gradient —
               // nu au voie în tooltip. Recharts nu le filtrează cu
               // tooltipType="none" când conținutul e custom, deci le excludem
               // explicit pe cheie (altfel s-ar afișa „Export -75” lângă
-              // „Sold net -75” — aceeași valoare de două ori).
+              // „Sold net -75” — aceeași valoare de două ori). Fără hideZero:
+              // „Sold net” real la valoarea 0 (echilibru perfect) trebuie să
+              // rămână vizibil — hideZero l-ar ascunde și pe el (fix 0.3.27).
               hideKeys={["soldImport", "soldExport"]}
             />
           }

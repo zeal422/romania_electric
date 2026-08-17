@@ -98,6 +98,28 @@ print("parse_prices_csv OK")
     },
     TEST_TIMEOUT,
   );
+
+  it(
+    "respinge zilele DST cu 23/25 de intervale (prețurile ar fi decalate)",
+    () => {
+      py(`
+# Zilele DST au 23 (trecerea la ora de vară) sau 25 (iarnă) de intervale.
+# priceForHour indexează prices[hour] pozițional → un număr diferit de 24
+# ar decala prețurile cu o oră după ora sărită. Decizie confirmată: reject la
+# parse (fix 0.3.27) — „prețuri indisponibile" e mai bine decât prețuri greșite.
+def csv_with(n):
+    rows = ['"Interval","Average Price [Euro/MWh]","Resolution"']
+    for i in range(n):
+        rows.append(f'"{i+1}","{100+i}","PT60M"')
+    return "\\r\\n".join(rows)
+assert m.parse_prices_csv(csv_with(23)) is None
+assert m.parse_prices_csv(csv_with(25)) is None
+assert m.parse_prices_csv(csv_with(24)) is not None
+print("parse_prices_csv DST OK")
+`);
+    },
+    TEST_TIMEOUT,
+  );
 });
 
 describe("capture_prices — merge_prices (dedupe + suprascriere pe dată)", () => {
@@ -137,6 +159,21 @@ merged, changed = m.merge_prices(
 )
 assert changed is True
 assert len(merged) == 2
+
+# Record-uri MALFORMATE (date None / prețuri ne-numerice / NaN) → excluse fără
+# crash — bug real (fix 0.3.27): sorted(key=lambda x: x["date"]) arunca
+# TypeError la date: None, iar ["abc"]/NaN ar polua data/sen-prices.json.
+merged, changed = m.merge_prices(
+    [
+        {"date": None, "prices": [1.0], "currency": "EUR"},
+        {"date": "2026-08-12", "prices": ["abc"], "currency": "EUR"},
+        {"date": "2026-08-11", "prices": [float("nan")], "currency": "EUR"},
+        {"date": "2026-08-10", "prices": [7.0], "currency": "EUR"},
+    ],
+    {"date": "2026-08-09", "prices": [3.0], "currency": "EUR"},
+)
+assert changed is True
+assert [p["date"] for p in merged] == ["2026-08-09", "2026-08-10"]
 print("merge_prices OK")
 `);
     },
@@ -277,24 +314,39 @@ describe("capture_prices — end-to-end (mock server + fișier temporar)", () =>
   it(
     "adaugă zile noi la o serie existentă, păstrând ordinea cronologică și dedupe-ul pe dată",
     () => {
-      // Seed cu o zi veche (nu e în backfill-ul de 2 zile) + o zi care VA fi
-      // suprascrisă. Rularea descarcă ultimele 2 zile (15 și 14 aug — azi e
-      // 15 aug), deci 14 aug din seed e suprascris cu prețurile noi → total 3.
+      // Baza temporală = fusul României, ca în capture_prices (datetime.now(TZ_RO)).
+      // Seed-ul e derivat din timpul curent (nu hardcodat — bug 0.3.26: „azi e 15 aug"
+      // eșua în orice altă zi): o zi veche clar în afara ferestrei de backfill de 2
+      // zile (acum-30zile) + „ieri" (mereu în fereastră → va fi suprascris).
+      // Cheia „YYYY-MM-DD" e construită din formatToParts() (robust — formatul
+      // exact al format() cu locale-ul „en-CA" nu e garantat de spec), nu din
+      // fmt.format() care presupune un format de ieșire specific.
+      const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Bucharest" });
+      const parts = fmt.formatToParts(new Date());
+      const get = (type: Intl.DateTimeFormatPartTypes) =>
+        parts.find((p) => p.type === type)?.value ?? "";
+      const roToday = `${get("year")}-${get("month")}-${get("day")}`;
+      // Ancorat la prânz UTC: scăderea de la prânz dă mereu ziua calendaristică
+      // anterioară, indiferent de DST (nu Date.now() - 86400000, care poate sări o zi).
+      const yesterday = fmt.format(new Date(`${roToday}T12:00:00Z`).getTime() - 86_400_000);
+      const oldSeed = fmt.format(new Date(`${roToday}T12:00:00Z`).getTime() - 30 * 86_400_000);
       const seed = [
-        { date: "2026-01-01", prices: [1], currency: "EUR" },
-        { date: "2026-08-14", prices: [999], currency: "EUR" }, // va fi suprascris
+        { date: oldSeed, prices: [1], currency: "EUR" },
+        { date: yesterday, prices: [999], currency: "EUR" }, // va fi suprascris
       ];
       writeFileSync(outFile(), JSON.stringify(seed));
       setPayload(CSV_24);
       const { status } = runCapture();
       expect(status).toBe(0);
       const data = JSON.parse(readFileSync(outFile(), "utf-8"));
+      // oldSeed (rămâne) + yesterday (suprascris) + azi (nou) = 3.
       expect(data).toHaveLength(3);
-      expect(data[0].date).toBe("2026-01-01");
+      expect(data[0].date).toBe(oldSeed);
       // Ziua existentă suprascrisă cu prețurile noi (24), nu cu [999].
-      const old = data.find((d: { date: string }) => d.date === "2026-08-14");
-      expect(old.prices).toHaveLength(24);
-      expect(old.prices[0]).toBe(100);
+      const old = data.find((d: { date: string }) => d.date === yesterday);
+      expect(old).toBeDefined();
+      expect(old!.prices).toHaveLength(24);
+      expect(old!.prices[0]).toBe(100);
       // Ordine cronologică.
       expect(data[0].date < data[1].date && data[1].date < data[2].date).toBe(true);
     },

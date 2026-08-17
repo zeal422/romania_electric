@@ -6,7 +6,7 @@ Arhiva locală acoperă intervalul **1 iulie → 9 august 2026**, cu **5.606 de 
 
 Începând cu v0.3.26, dashboard-ul include și **costul estimat al importurilor/exporturilor**: volumele reale (sold, de la Transelectrica) × prețurile **PZU orare reale** (export CSV public OPCOM, fără cheie/API), afișate pe intervalul selectat cu eticheta onestă _„estimare bazată pe prețurile PZU (day-ahead)"_.
 
-![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-216%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
+![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-227%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 
 ---
 
@@ -64,7 +64,7 @@ bun run start      # pornește serverul de producție din .next/standalone
 | `bun run dev`                     | Server de dezvoltare pe portul 3000                                                                                                                   |
 | `bun run build`                   | Build de producție (standalone + static)                                                                                                              |
 | `bun run start`                   | Pornește build-ul standalone                                                                                                                          |
-| `bun test`                        | Rulează cele 216 de teste unitare                                                                                                                     |
+| `bun test`                        | Rulează cele 227 de teste unitare                                                                                                                     |
 | `bun run typecheck`               | Verificare tipuri TypeScript (`tsc --noEmit`)                                                                                                         |
 | `bun run lint`                    | ESLint                                                                                                                                                |
 | `bun run format` / `format:check` | Prettier (scriere / verificare)                                                                                                                       |
@@ -98,7 +98,7 @@ snapshot /sen-filter → data/sen-storage.json (capturi orare, workflow storage-
 
 Prețuri PZU (costuri):
 export CSV public OPCOM → data/sen-prices.json (captură zilnică, workflow price-capture)
-        │  src/lib/sen/prices.ts + costs.ts (server-only, cache TTL)
+        │  src/lib/sen/prices.ts (server-only, cache TTL) + costs.ts (funcții pure)
         ▼
 /api/sen/costs  →  rezumate cost/venit/sold net în cardurile principale
 ```
@@ -108,7 +108,7 @@ export CSV public OPCOM → data/sen-prices.json (captură zilnică, workflow pr
 - **Valori real-time**: `src/lib/sen/instant.ts` poll-uiește `/sen-filter` (TTL 10s server + polling client 30s + `refetchOnWindowFocus`) pentru Consum/Producție/Sold + mixul curent; la eșec UI-ul cade lin pe seria istorică. Graficele rămân la cadența reală a sursei (~10 min).
 - **Automatizare**: workflow-ul `.github/workflows/data-refresh.yml` rulează zilnic `bun run data:refresh` și face commit — istoricul crește singur, iar Vercel redeploy-ează automat (Git integration).
 - **Stocare (ISPOZ)**: Transelectrica expune stocarea doar ca snapshot (`/sen-filter`), fără istoric. Workflow-ul `.github/workflows/storage-capture.yml` (cron orar) rulează `python3 scripts/convert-sen.py --capture-storage` și acumulează puncte în `data/sen-storage.json`; la runtime `src/lib/sen/storage.ts` întreabă snapshot-ul live (TTL 3 min), cu fallback în ordine: **răspunsul live → snapshot-ul live stale din cache → ultima captură** (Transelectrica indisponibilă nu rupe site-ul).
-- **Prețuri PZU (costuri)**: OPCOM publică prețurile orare day-ahead ca export CSV public, fără cheie (`/rapoarte-pzu-raportPIP-export-csv/{DD}/{MM}/{YYYY}/en?resolution=60`). Workflow-ul `.github/workflows/price-capture.yml` (cron zilnic) rulează `python3 scripts/convert-sen.py --capture-prices` și acumulează zile în `data/sen-prices.json` (backfill automat ~35 zile, idempotent). La runtime `src/lib/sen/prices.ts` + `costs.ts` combină volumele reale cu prețurile (cache TTL); dacă prețurile lipsesc, cardurile arată doar volumele — site-ul nu se rupe niciodată.
+- **Prețuri PZU (costuri)**: OPCOM publică prețurile orare day-ahead ca export CSV public, fără cheie (`/rapoarte-pzu-raportPIP-export-csv/{DD}/{MM}/{YYYY}/en?resolution=60`). Workflow-ul `.github/workflows/price-capture.yml` (cron zilnic) rulează `python3 scripts/convert-sen.py --capture-prices` și acumulează zile în `data/sen-prices.json` (backfill automat ~35 zile, idempotent). La runtime `src/lib/sen/prices.ts` (cache TTL) + `costs.ts` (funcții pure) combină volumele reale cu prețurile; dacă prețurile lipsesc, cardurile arată doar volumele — site-ul nu se rupe niciodată.
 
 > Notă: datele din fișierul sursă sunt etichetate cu anul 2026. Le afișăm fidel, așa cum apar în sursă, fără modificarea anului.
 
@@ -168,7 +168,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ├── scripts/
 │   ├── convert-sen.py            # xlsx → JSON (convert) + fetch live incremental (refresh) + captură stocare/prețuri
 │   └── check-hydration.sh        # CI check erori de hidratare
-├── tests/                        # 216 de teste unitare (aggregate, stats, format, live, instant, storage, costs, captură)
+├── tests/                        # 227 de teste unitare (aggregate, stats, format, live, instant, storage, costs, captură)
 │   ├── sen/                      # tests/sen/*.test.ts (aggregate, stats, format, live, instant, costs)
 │   ├── storage.test.ts           # stocare ISPOZ (parser + cache + fallback + source)
 │   ├── capture-storage.test.ts   # logica Python de captură (--capture-storage, mock server)
@@ -182,7 +182,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ```bash
 bun run check       # totul într-o singură comandă (vezi mai jos)
 bun run typecheck   # TypeScript strict
-bun test            # 216 de teste unitare — toate trec
+bun test            # 227 de teste unitare — toate trec
 bun run lint        # ESLint curat
 bun run format:check
 bun run check:hydration  # fără erori de hidratare în browser (necesită agent-browser)
@@ -194,7 +194,7 @@ bun run check:hydration  # fără erori de hidratare în browser (necesită agen
 2. `docs:check` — documentația e la zi cu codul (hash-uri vs. fișiere sursă)
 3. `lint` — ESLint
 4. `typecheck` — `tsc --noEmit`
-5. `test` — 216 de teste unitare
+5. `test` — 227 de teste unitare
 6. `build` — build de producție (inclusiv validarea tipurilor)
 
 Rulează `bun run check` local înainte de fiecare release (sau într-un pipeline CI, dacă adaugi unul).

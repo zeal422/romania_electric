@@ -6,6 +6,31 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.27] — 2026-08-16, 08:21 EEST
+
+### Corectat
+
+- **Testul `capture-prices` nu mai depinde de data curentă (CI era roșu în orice zi ≠ 15 aug)**: seed-ul hardcoda „azi e 15 aug"; acum ambele date din seed sunt derivate din timpul curent în fusul României (acum-30 zile + ieri, ancorate la prânz UTC — DST-safe), iar assertions folosesc aceleași date — testul trece în orice zi.
+- **`merge_prices` nu mai crapă pe record-uri malformate din `data/sen-prices.json`** (`date: None` → `TypeError` la sortare; prețuri ne-numerice/NaN ar fi poluat fișierul): validare strictă la citire (`_valid_price_record` — date string + prețuri finite) + test de regresie cu cazul real.
+- **`customRangeToBoundaries` respinge acum date inexistente și range-uri fără suprapunere**: `new Date("2026-02-30")` se normalizează silențios la 2 martie (V8/JSC) — parse strict `YYYY-MM-DD` + round-trip prin `Date.UTC`; iar un range integral înaintea/după serie producea interval inversat (`from > to`) în loc de `null` — acum `null` după clamp. 3 teste noi (inclusiv perechea `2026-02-30 → 2026-03-05` care eșuează întâi corect pe codul nemodificat).
+- **Zilele DST (23/25 de intervale) sunt respinse la parse-ul prețurilor PZU** (decizie confirmată): `priceForHour` indexează `prices[hour]` pozițional, deci un număr diferit de 24 intervale ar decala prețurile cu o oră — „prețuri indisponibile" e mai bine decât prețuri greșite. Docstring-urile `PriceDay`/`priceForHour` + docs/02/04 aliniate (eliminată „limitarea cunoscută… se rezolvă la octombrie").
+- **`coveredHours` numără ore unice, nu puncte**: la granularități sub-orare (10m/raw, 6 puncte/oră) `coveredHours` depășea `totalHours` (nonsens) — acum numără orele unice cu preț (Set), invariantul `coveredHours ≤ totalHours` + test de regresie.
+- **Tooltip-ul balanței afișează „Sold net" și la valoarea 0**: `hideZero` ascundea și rândul real la echilibru perfect — rămâne doar `hideKeys` (seriile de fill), fără `hideZero`.
+- **`Filters`/`RangePicker` reutilizează `customRangeToBoundaries`** în loc de `Date.UTC` inline duplicat (granițe + clamp într-un singur loc, comportament identic — `toISOString().slice(0, 10)` e echivalent cu getters UTC).
+- **Calendarul range muta ziua aleasă cu una în urmă pentru utilizatorii UTC+3 (România)** (bug pre-existent, descoperit la review): react-day-picker produce miezul nopții LOCAL, iar conversia prin `toISOString().slice(0, 10)` lua ziua UTC → click pe „15 aug" devenea „2026-08-14" (intervalul începea cu o zi mai devreme). Fix: `toLocalDateKey` — cheia `YYYY-MM-DD` din componentele LOCALE (`getFullYear/getMonth/getDate`), folosită de ambele onSelect; test de regresie care eșuează pe codul vechi în EEST și trece identic în ambele fusuri pe cel nou.
+- **`toLocalDateKey` mutată din `format.ts` în modul nou client-safe `src/lib/sen/calendar.ts`**: `format.ts` afișează datele sursă strict prin getters UTC (contract fake-UTC, AGENTS §4.7) — input-ul calendarului trăiește în fusul LOCAL al browser-ului, deci separarea modulelor ține contractul UTC-only al lui `format.ts` intact (prevenire: un agent viitor care vede getters locali în `format.ts` ar putea „repara" funcția înapoi la UTC și reintroduce off-by-one-ul). Importuri actualizate (`Filters`, `RangePicker`, test) + barrel `index.ts` extins.
+- **Testul `capture-prices` construiește `roToday` din `formatToParts()`** (robust — formatul exact al `Intl.DateTimeFormat.format()` cu locale-ul `en-CA` nu e garantat de spec, doar `formatToParts` e): funcționează identic pe Bun și Node azi, dar nu mai depinde de un format de ieșire ne-garantat.
+- **Manifest docs**: `range-picker.tsx` adăugat și la covers-ul `docs/08-harta-cautare.md` (era documentat acolo dar lipsit din manifest — `docs:check` nu l-ar fi marcat stale la modificări).
+- **Teste de caracterizare pentru `customRangeToBoundaries`/`parseIsoDate`** (4 teste noi): ziua 00 respinsă, lunile cu 30 de zile resping 31 (round-trip), an bisect (`2024-02-29` acceptat vs `2026-02-29` respins), an < 100 respins sigur (`Date.UTC` special-case 0-99 → 1999). Comportamentul era deja corect în cod (verificat empiric pe ambele runtime-uri) — testele fixează contractul de parse strict pentru input-ul utilizatorului; count total 223 → 227 (README, AGENTS, docs/07).
+- **Igienă**: eliminată împărțirea inutilă la `1` în `computeCosts` (`(p.sold * hours) / 1` → `p.sold * hours`) — cod mort fără impact funcțional (matematic identic), identificat la code-review (micro-smell).
+
+### Corectat (documentație)
+
+- **README**: `costs.ts` nu mai e descris cu „cache TTL" (e pur — doar `prices.ts` are cache) — corectat atât în diagrama de flux (l.101) cât și în proză (l.111).
+- **docs/05**: `ThemeToggle` avea celule lipite de rândul `ChartTooltip` (7 celule vs header de 3 coloane) — rând propriu; descrierea `hideZero`/`hideKeys` actualizată la comportamentul nou.
+- **docs/07**: „(7 fișiere)" în `tests/sen/` → 8; count-urile de teste 216 → 223 peste tot (README, AGENTS, docs/07).
+- **docs/08**: adăugat rândul `RangePicker` în harta UI (lipsea).
+
 ## [0.3.26] — 2026-08-15, 06:35 EEST
 
 ### Adăugat

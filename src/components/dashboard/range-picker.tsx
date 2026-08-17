@@ -7,7 +7,8 @@ import type { DateRange } from "react-day-picker";
 import { RANGE_PRESETS } from "@/components/dashboard/filters";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatRangeLabel } from "@/lib/sen/format";
+import { customRangeToBoundaries, formatRangeLabel } from "@/lib/sen/format";
+import { toLocalDateKey } from "@/lib/sen/calendar";
 import { cn } from "@/lib/utils";
 
 interface RangePickerProps {
@@ -112,23 +113,24 @@ export function RangePicker({
                 // doar când utilizatorul a ales și capătul.
                 setCalendarRange(range);
                 if (range?.from && range?.to && range.from.getTime() !== range.to.getTime()) {
-                  // Granițe UTC (contract fake-UTC): ziua aleasă = ziua întreagă.
-                  const f = Date.UTC(
-                    range.from.getUTCFullYear(),
-                    range.from.getUTCMonth(),
-                    range.from.getUTCDate(),
+                  // Granițe UTC (contract fake-UTC): ziua aleasă = ziua întreagă,
+                  // clampată la datele disponibile — logica pură în format.ts
+                  // (testată), aceeași folosită de page.tsx (fix F16).
+                  // Cheia din componentele LOCALE (nu toISOString → ziua UTC):
+                  // react-day-picker dă miezul nopții local, iar la UTC+3
+                  // toISOString ar muta ziua aleasă cu una în urmă (fix 0.3.27).
+                  const bounds = customRangeToBoundaries(
+                    {
+                      from: toLocalDateKey(range.from),
+                      to: toLocalDateKey(range.to),
+                    },
+                    startTs,
+                    endTs,
                   );
-                  const t = Date.UTC(
-                    range.to.getUTCFullYear(),
-                    range.to.getUTCMonth(),
-                    range.to.getUTCDate(),
-                    23,
-                    59,
-                    59,
-                    999,
-                  );
-                  onCustomRangeChange(f, t);
-                  setOpen(false);
+                  if (bounds) {
+                    onCustomRangeChange(bounds.from, bounds.to);
+                    setOpen(false);
+                  }
                 }
               }}
               disabled={[{ before: new Date(startTs), after: new Date(endTs) }]}

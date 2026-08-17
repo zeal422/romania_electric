@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { toLocalDateKey } from "@/lib/sen/calendar";
 import {
   customRangeToBoundaries,
   dataAgeMs,
@@ -309,6 +310,97 @@ describe("customRangeToBoundaries (interval personalizat → granițe UTC clampa
     const r = customRangeToBoundaries({ from: "2026-08-12", to: "2026-08-12" }, startTs, endTs);
     expect(r!.from).toBe(Date.UTC(2026, 7, 12, 0, 0, 0));
     expect(r!.to).toBe(Date.UTC(2026, 7, 12, 23, 59, 59, 999));
+  });
+
+  it("null pentru dată inexistentă (2026-02-30 se normalizează la 2 mar în V8/JSC)", () => {
+    // Cu to: "2026-03-01" testul ar trece DIN GREȘEALĂ pe codul nemodificat
+    // (rolled-over from = 2 mar > to = 1 mar → null accidental). Cu
+    // to: "2026-03-05" codul vechi întoarce interval inversat non-null →
+    // testul eșuează întâi corect (§4.14).
+    expect(
+      customRangeToBoundaries({ from: "2026-02-30", to: "2026-03-05" }, startTs, endTs),
+    ).toBeNull();
+    // Luna invalidă e respinsă de regex/round-trip, nu doar de Number.isFinite.
+    expect(
+      customRangeToBoundaries({ from: "2026-13-01", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  it("null când range-ul e integral înaintea seriei (după clamp, from > to)", () => {
+    // Seria începe pe 1 iul: 1–5 mai e complet în afara ei. Codul vechi
+    // clamp-a la [startTs, 5 mai] → interval inversat non-null (bug).
+    expect(
+      customRangeToBoundaries({ from: "2026-05-01", to: "2026-05-05" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  it("null când range-ul e integral după serie (după clamp, from > to)", () => {
+    // Seria se termină pe 15 aug: 1–5 sep e complet în afara ei.
+    expect(
+      customRangeToBoundaries({ from: "2026-09-01", to: "2026-09-05" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  // ── Teste de CARACTERIZARE pentru parseIsoDate (fix 0.3.27) ──────────────
+  // Comportamentul e deja corect în cod (verificat empiric) — acestea fixează
+  // contractul, NU sunt teste de regresie (§4.14 se aplică regresiei: trec pe
+  // codul actual). `to` e fixat în serie (2026-08-14): dacă `from` ar fi
+  // ACCEPTAT de parse, intervalul ar fi clampat la startTs → non-null; null
+  // DOVEDEȘTE reject-ul la parse (nu clamp-ul).
+
+  it("caracterizare: ziua 00 (2026-01-00) e respinsă la parse", () => {
+    // Date.UTC(2026, 0, 0) = 31 dec 2025 — round-trip (getUTCDate() = 31 ≠ 0)
+    // respinge, în loc să accepte silențios ziua inexistentă.
+    expect(
+      customRangeToBoundaries({ from: "2026-01-00", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  it("caracterizare: luna cu 30 de zile respinge ziua 31 (round-trip)", () => {
+    // Date.UTC(2026, 3, 31) = 1 mai și Date.UTC(2026, 5, 31) = 1 iul — dacă
+    // n-ar fi prinse de round-trip, s-ar normaliza silențios la luna următoare.
+    expect(
+      customRangeToBoundaries({ from: "2026-04-31", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+    expect(
+      customRangeToBoundaries({ from: "2026-06-31", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  it("caracterizare: an bisect — 2024-02-29 acceptat, 2026-02-29 respins", () => {
+    // 2024 e bisect (29 feb real) → parse OK → clamp la startTs (seria începe
+    // 1 iul 2026). 2026 nu e bisect → Date.UTC(2026, 1, 29) = 1 mar → respins.
+    const ok = customRangeToBoundaries({ from: "2024-02-29", to: "2026-08-14" }, startTs, endTs);
+    expect(ok).not.toBeNull();
+    expect(ok!.from).toBe(startTs); // clampat la începutul seriei
+    expect(
+      customRangeToBoundaries({ from: "2026-02-29", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+  });
+
+  it("caracterizare: an < 100 e respins sigur (Date.UTC special-case 0-99)", () => {
+    // Date.UTC(99, …) = 1999 (spec: anii 0-99 = 1900+an) → round-trip eșuează
+    // → respingere SIGURĂ (null), fără risc de date greșite. Irelevant pentru
+    // datele aplicației (2026), dar contractul e fixat explicit.
+    expect(
+      customRangeToBoundaries({ from: "0099-01-01", to: "2026-08-14" }, startTs, endTs),
+    ).toBeNull();
+  });
+});
+
+describe("toLocalDateKey", () => {
+  it("redă ziua calendaristică LOCALĂ (nu ziua UTC) — fix off-by-one UTC+3", () => {
+    // react-day-picker produce miezul nopții LOCAL al zilei click-uite. Pentru
+    // un browser UTC+3 (România — publicul țintă), click-ul pe „15 aug" creează
+    // un Date = 14 aug 21:00 UTC, iar toISOString().slice(0,10) ar da
+    // „2026-08-14" (ziua greșită — off-by-one). Getters-ii locali redau mereu
+    // ziua pe care utilizatorul a văzut-o în calendar, în orice fus.
+    const sel = new Date(2026, 7, 15, 0, 0, 0); // click pe „15 aug" (local midnight)
+    expect(toLocalDateKey(sel)).toBe("2026-08-15");
+  });
+
+  it("completează cu zero ziua și luna cu o singură cifră", () => {
+    expect(toLocalDateKey(new Date(2026, 0, 5, 0, 0, 0))).toBe("2026-01-05");
   });
 });
 
