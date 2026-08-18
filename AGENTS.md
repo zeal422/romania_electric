@@ -8,7 +8,7 @@ Acest fișier îi ajută pe agenții AI (și pe orice dezvoltator nou) să lucre
 
 Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**, cu date Transelectrica:
 
-- **5.606 de înregistrări** la ~10 minute (01.07.2026 → 09.08.2026), în creștere zilnică (date live Transelectrica).
+- **6.792 de înregistrări** la ~10 minute (01.07.2026 → 17.08.2026), în creștere zilnică (date live Transelectrica).
 - Câmpuri: `consum`, `medieConsum`, `productie`, `carbune`, `hidrocarburi`, `ape`, `nuclear`, `eolian`, `foto`, `biomasa`, `sold`. **Semantica sold** (confirmată pe sursa oficială, `SOLD = CONS − PROD`): pozitiv = import, negativ = export. ⚠️ **Ordinea coloanelor de la endpoint-ul live diferă de xlsx** — live pune `sold` pe poziția 4 (vezi [docs/02](./docs/02-pipeline-date.md)).
 - Stack: **Next.js 16 (App Router) + React 19 + TypeScript strict + Tailwind 4 + shadcn/ui + Recharts + React Query**, rulat cu **Bun**.
 
@@ -16,9 +16,9 @@ Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**,
 
 ```bash
 bun install            # instalează dependențele (Bun, NU npm/pnpm/yarn)
-bun run dev            # server de dezvoltare pe :3000
+bun run dev            # server de dezvoltare pe :3000 (wrapper scripts/dev.sh: auto-refresh date vechi, apoi pornește)
 bun run check          # CI complet: format → docs → lint → typecheck → teste → build
-bun test               # 227 de teste unitare — TOATE trebuie să treacă
+bun test               # 240 de teste unitare — TOATE trebuie să treacă
 bun run typecheck      # tsc --noEmit — trebuie să fie curat
 bun run lint           # ESLint — trebuie să fie curat
 bun run format:check   # Prettier — trebuie să fie curat
@@ -41,9 +41,9 @@ src/app/api/sen/    ← API routes subțiri (fără logică de business) — inc
 src/hooks/          ← Hook-uri client (React Query) — incl. use-storage-data.ts + use-instant-data.ts.
 src/components/dashboard/ ← UI dashboard (incl. storage-card.tsx). src/components/ui/ = shadcn/ui (nu modifica de mână).
 data/               ← sen-data.json + sen-summary.json + sen-storage.json (GENERATE, nu le edita manual).
-scripts/            ← convert-sen.py (pipeline date + --capture-storage) + check-hydration.sh (CI).
+scripts/            ← convert-sen.py (pipeline date + --capture-storage + --refresh-if-stale) + dev.sh (wrapper bun run dev: auto-refresh) + check-hydration.sh (CI).
 .github/workflows/  ← data-refresh.yml (zilnic) + storage-capture.yml (orar) + price-capture.yml (zilnic).
-tests/              ← 227 de teste unitare (lib/sen + storage + instant + captură Python + preferințe).
+tests/              ← 240 de teste unitare (lib/sen + storage + instant + captură Python + preferințe).
 upload/             ← Grafic_SEN.xlsx (sursa datelor).
 ```
 

@@ -6,6 +6,90 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.32] — 2026-08-18, 11:20 EEST
+
+### Corectat
+
+- **Teardown robust al mock server-elor la evenimentele `error` ale child-process-ului** (`tests/dev-refresh.test.ts`, `stopMockServer`): `waitForExit` se rezolvă acum la PRIMUL dintre `exit`/`close`/`error` (o singură cale, nu un wait per eveniment) + **error-listener permanent** atașat la nașterea procesului (`startMockServer`) și pe toată durata ambelor încercări de oprire (SIGTERM + SIGKILL). Fără el, un kill eșuat cu **EPERM** (ramura `else` din `ChildProcess.kill`, Node 22 — real în containere/CI) sau un spawn eșuat (ENOENT) emit `error` fără ascultător → „Unhandled 'error' event” → **crash-ul întregului test runner**, nu doar fail de test. `error` = kill/spawn eșuat → procesul e tratat ca încă viu → escaladare SIGKILL → fail-test dacă tot nu moare (nu continuăm niciodată cu proces viu pe port). Handling-ul existent pentru procese lipsă/deja moarte e păstrat (fix claim 8).
+
+### Teste
+
+- **`tests/dev-refresh.test.ts`**: test nou „kill eșuat (EPERM simulat) nu crapă runner-ul și procesul e oprit oricum” — proces viu care ignoră SIGTERM, `error` emis în timpul `waitForExit`, verifică oprirea garantată; **pică pe codul vechi** cu „Unhandled 'error' event” (§4.14, verificat empiric prin revert temporar). Count total 239 → **240** (README, AGENTS, docs/07).
+
+## [0.3.31] — 2026-08-18, 10:42 EEST
+
+### Adăugat
+
+- **Observabilitate la fetch-ul live** (`live.ts`): fiecare fetch reușit de la Transelectrica loghează acum durata + volumul (`[live] fetch OK: N înregistrări în Xms`) — degradarea endpoint-ului (rate limiting, trunchiere, răspunsuri lente spre timeout-ul de 15s) devine vizibilă devreme în loguri, nu doar la eșec complet (fix TO_FIX **P2-001**).
+
+### Corectat
+
+- **`scripts/dev.sh`: `set -e` activ (fail-fast)** — pasul de refresh e mutat în `if ! python3 ...; then` (comandă condițională, NU declanșează exit la eșec — verificat empiric): invariantul „un refresh eșuat nu blochează pornirea serverului” rămâne garantat, iar orice altă eroare (ROOT/cd/PATH) oprește scriptul imediat, ca serverul să nu pornească dintr-o stare neașteptată (fix TO_FIX **P2-003**).
+- **Comentariul `MAX_BACKFILL_MS` scurtat** (`live.ts`): blocul de 8 linii care duplica raționamentul din docs/02 e redus la esențial + referință la documentație (fix TO_FIX **P3-001**).
+
+### Teste
+
+- **`tests/sen/live.test.ts`**: test nou pentru logging-ul de observabilitate (spy pe `console.log` → mesajul conține „2 înregistrări” + durata în ms; pică pe codul vechi fără log — §4.14). Count total 238 → **239** (README, AGENTS, docs/07).
+
+### Notă (claims respinse, documentate)
+
+- **P2-002** (logging parțial live OK / prices FAIL): premisă falsă — `fetch_prices_day` prinde eșecurile de rețea intern și loghează per-zi (`sar peste zi`); `capture_prices` nu aruncă la rețea, deci nu există „eșec prins generic” de distins.
+- **P3-002** (timeout 5s `stopMockServer`): deja rezolvat — rescrierea cu SIGKILL + fail-test elimină riscul de EADDRINUSE/proces-vechi; claim-ul era stale.
+- **P3-003** (nume `last_ts`): cosmetic; locația din claim (l. 597) e greșită — variabila e la l. 269; impact zero (variabilă locală).
+
+## [0.3.30] — 2026-08-18, 09:05 EEST
+
+### Corectat
+
+- **Plafonul de backfill live ridicat de la 10 la 30 de zile** (`live.ts`, `MAX_BACKFILL_MS`) — garantia documentată „preset-ul de 30 de zile e garantat acoperit" era falsă cu un backfill de 10 zile (fix TO_FIX round 2, claim 4). Endpoint-ul Transelectrica răspunde corect pe 30 de zile (verificat empiric: 4374 puncte în ~323ms, confortabil sub timeout-ul de 15s). Acum preset-urile „7 zile" ȘI „30 zile" sunt garantat acoperite chiar și cu `data/sen-data.json` stale.
+- **Fallback-ul pe static gol folosește acum întregul plafon** (`live.ts`, funcția pură nouă `lastStaticTs`): înainte, cu `data/sen-data.json` gol, fereastra live era doar `now − 26h` (constantă `now − 24h` + overlap 2h) — preset-urile 3d/7d/30d apăreau aproape goale la prima rulare. Acum e `now − MAX_BACKFILL_MS` (30 de zile) — fereastra completă configurată (fix TO_FIX round 2, claim 5).
+- **`sen-summary.json` e reconstruit din records valide când e lipsă/corupt** (`scripts/convert-sen.py`, `ensure_summary_from_data` apelat în `--refresh-if-stale` după `--fetch` + `--capture-prices`): dacă live-ul eșuează (rețea) sau întoarce doar timestamps duplicate, `refresh_from_live` iese devreme fără să scrie — summary-ul rămânea corupt, `is_data_stale` rămânea True la fiecare pornire, iar `/api/sen/summary` ar fi dat 500 (fix TO_FIX round 2, claim 2).
+- **`endTs` NaN/Infinity în summary e tratat ca stale** (`is_data_stale` + `math.isfinite`): înainte, `nan > 24` e False → datele păreau veșnic „proaspete" și refresh-ul nu mai rula niciodată (fix TO_FIX round 2, claim 3).
+- **Teste anti-flaky pentru mock server-e** (`tests/dev-refresh.test.ts`, `waitForServer`): subprocesul `--refresh-if-stale` pornește doar după ce ambele mock server-e (live + prețuri) acceptă conexiuni — race-ul dintre spawn și bind putea produce „No new records" intermitent (fix TO_FIX round 2, claim 6).
+
+### Documentație
+
+- **`docs/.docs-manifest.json`**: `tests/dev-refresh.test.ts` adăugat în `covers` pentru docs/07 (era documentat dar netrasat în manifest — garda de staleness nu-l acoperea; fix TO_FIX round 2, claim 1).
+- **docs/02**: contractul de backfill actualizat (30 de zile, verificat empiric 4374 puncte); modulul `--refresh-if-stale` documentat cu reconstrucția summary-ului + `endTs` non-finit.
+- **docs/07**: count-uri 234 → **238** (13 fișiere); rândul `live.test.ts` extins (`lastStaticTs`, plafon 30 de zile); rândul `dev-refresh.test.ts` extins (NaN/Inf, summary reconstruit, readiness probe).
+- **README/AGENTS**: count-uri teste 234 → 238.
+
+## [0.3.29] — 2026-08-17, 12:42 EEST
+
+### Adăugat
+
+- **Auto-refresh la pornirea serverului de dev (Varianta A)** — `bun run dev` aduce acum datele la zi dacă sunt vechi, ca localhost să se comporte ca online (exact ce fac workflow-urile GitHub în producție):
+  - **`scripts/convert-sen.py` — modul nou `--refresh-if-stale`**: dacă `is_data_stale(24h)` (endTs-ul din `sen-summary.json` mai vechi de 24h, sau fișier lipsă/corupt), rulează `--fetch` + `--capture-prices`; dacă datele sunt proaspete, **nu atinge rețeaua** (pornire instant). Funcția pură `is_data_stale(max_age_h)` e testabilă determinist.
+  - **Invariantul critic**: orice eroare neașteptată e prinsă intern și iese cu **exit 0** — un eșec al refresh-ului NU blochează niciodată pornirea serverului („warning, nu blocker"), verificat prin test dedicat cu summary corupt.
+  - **`scripts/dev.sh` (nou)** — wrapper pentru `bun run dev`: rulează `--refresh-if-stale`, apoi pornește `next dev -p 3000 2>&1 | tee dev.log` (pipeline-ul identic cu scriptul vechi). Autosuficient: prepend-ează `node_modules/.bin` în PATH (verificat empiric: `bun run` în modul fișier nu adaugă binarele locale) — `next` se rezolvă indiferent de mediul de rulare. `package.json`: `"dev": "bash scripts/dev.sh"`.
+  - **Env-uri overridable noi** (pattern existent `SEN_STORAGE_*`/`SEN_PRICES_*`): `SEN_DATA_OUT`, `SEN_SUMMARY_OUT`, `SEN_LIVE_URL` — testele nu ating niciodată datele reale din `data/`.
+
+### Teste
+
+- **`tests/dev-refresh.test.ts` (nou, 4 teste)**: `is_data_stale` (proaspăt → False, vechi/lipsă/corupt → True), flux complet cu mock server + fișiere temp (date proaspete → zero rețea + neschimbat; date vechi → endTs actualizat + exit 0; summary corupt → tot exit 0 — invariantul wrapper-ului). Count total 230 → **234** (README, AGENTS, docs/07).
+
+### Corectat (documentație)
+
+- **README/AGENTS**: `bun run dev` descris cu auto-refresh; structura `scripts/` include `dev.sh`; count-uri teste 230 → 234.
+- **docs/02**: modulul `--refresh-if-stale` documentat (prag 24h, exit 0 garantat, env-uri noi).
+- **docs/07**: rând nou `dev-refresh.test.ts` în tabel; count-uri 230 → 234 (13 fișiere).
+
+## [0.3.28] — 2026-08-17, 12:17 EEST
+
+### Corectat
+
+- **Preset-urile de interval arată acum exact zilele promise — gaura dintre static și live eliminată** (bug raportat: „7 zile” afișa doar ~4 zile de date). Cauza: `MAX_BACKFILL_MS` (fereastra de fetch live) era plafonat la 3 zile, iar `data/sen-data.json` era stale (înghețat pe 9 aug, workflow-ul `data-refresh` nu rulase) → 5 zile fără niciun punct între static și live. Fix în două părți:
+  - **Runtime (`live.ts`)**: `MAX_BACKFILL_MS` 3 → **10 zile** (endpoint-ul Transelectrica răspunde corect pe 10 — verificat empiric: ~1478 puncte). Fereastra de fetch e centralizată în funcția pură nouă `liveBackfillFrom(lastStaticTs, now)` (testabilă determinist). Invariantul restabilit: orice fereastră ≤ 10 zile e garantat acoperită de live, indiferent de vârsta staticului.
+  - **Date locale la zi (pipeline oficial, §4.3)**: `bun run data:refresh` — `data/sen-data.json` 5.606 → **6.792 înregistrări** (interval 01.07 → 17.08); `--capture-prices` — prețurile PZU la zi (ultima zi 17 aug, era 15 aug).
+- **Test de regresie (§4.14)** pentru fereastra live: `liveBackfillFrom` cu static stale de 8 zile trebuie să întoarcă o fereastră ≥ 7 zile — pică pe codul vechi (3 zile → 3.0 zile < 7, verificat), trece pe cel nou (8.1 zile). Plus: plafonul 10 zile respectat (static foarte vechi) și overlap 2h cu static proaspăt (fără backfill inutil). Count total 227 → **230** (README, AGENTS, docs/01, docs/07).
+- **Prospețimea pe termen lung — constatare, nu fix de cod**: repo-ul local **nu are remote GitHub** (`git remote -v` gol), deci workflow-urile `data-refresh`/`storage-capture`/`price-capture` nu pot rula — asta e cauza staticului înghețat, nu un bug de script (workflow-urile sunt corecte). Pentru ca datele să rămână la zi automat, repo-ul trebuie împins pe GitHub cu Actions activat. Istoricul de stocare (ISPOZ) de pe 9 aug e irecuperabil (snapshot-uri orare pierdute) — se reface doar când cron-ul orar reia.
+
+### Corectat (documentație)
+
+- **docs/02**: contractul de backfill runtime documentat (10 zile, `liveBackfillFrom`, motivația fix-ului); count 5.606 → 6.792.
+- **README/AGENTS/docs/01**: count-uri înregistrări (5.606 → 6.792) și interval (01.07 → 17.08); count teste 227 → 230.
+- **docs/07**: rândul `live.test.ts` extins cu `liveBackfillFrom` (fereastra „7 zile” cu static stale); count-uri 227 → 230.
+
 ## [0.3.27] — 2026-08-16, 08:21 EEST
 
 ### Corectat

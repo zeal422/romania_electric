@@ -9,7 +9,7 @@ upload/Grafic_SEN.xlsx   ← sursă istorică Transelectrica (rebuild complet)
         │
         │  bun run data:convert  (= python3 scripts/convert-sen.py)
         ▼
-data/sen-data.json       ← 5.606 înregistrări tipizate, sortate crescător după ts
+data/sen-data.json       ← 6.792 înregistrări tipizate, sortate crescător după ts
 data/sen-summary.json    ← statistici globale precalculate (KPI instant)
         ▲
         │  bun run data:refresh  (= python3 scripts/convert-sen.py --fetch)
@@ -69,6 +69,8 @@ API route (/api/sen/instant) → snapshot sau `null` (eșec/stale) ← polling c
 - ⚠️ **Ordinea coloanelor DIFERĂ de xlsx**: endpoint-ul live pune `Sold` pe **poziția a 4-a** (imediat după `Productie`), apoi `Carbune…Biomasa`; xlsx-ul are `Sold` pe **ultima** poziție. Verificat pe payload live vs. xlsx la același ts (18:07:57: live `…;-407;657;1101;849;678;2263;726;57` = xlsx `Sold −407, Carbune 657, …`). Implementare: `LIVE_FIELDS` în `convert-sen.py` + `FIELD_ORDER` în `live.ts`.
 - Cu `_SENGrafic_WAR_SENGraficportlet_excel=true` întoarce un `.xlsx` real (același „Genereaza Excel" de pe site).
 - Se actualizează la **~10 minute**. ⚠️ Interogările pe **>2 luni pot dura 30+ secunde** — de aceea fetch-ul e mereu **incremental** (doar de la ultimul `ts` cunoscut, cu overlap).
+- **Backfill-ul runtime (`live.ts`, `MAX_BACKFILL_MS`) e de 30 de zile** (fix TO_FIX round 2; 0.3.28 avea 10, 0.3.22 avea 3): când `data/sen-data.json` e stale (ex: workflow-ul de refresh nu a rulat), serverul întreabă live-ul **cel puțin 30 de zile înapoi**, ca preset-urile „7 zile” ȘI „30 zile” să fie garantat acoperite — altfel rămânea o gaură de zile între static și live, iar graficele afișau mai puține zile decât promite butonul. Endpoint-ul răspunde corect pe 30 de zile (verificat empiric: 4374 puncte în ~323ms — confortabil sub timeout-ul de 15s). Funcțiile pure `liveBackfillFrom(lastStaticTs, now)` + `lastStaticTs(staticReadings, now)` (fallback pe static gol → fereastra completă) centralizează calculul (testate în `tests/sen/live.test.ts`).
+- **Modulul `--refresh-if-stale` reconstruiește `sen-summary.json` din records valide dacă e lipsă/corupt** (fix TO_FIX round 2): când live-ul eșuează (rețea) sau întoarce doar timestamps duplicate, `refresh_from_live` iese devreme fără să scrie — dar summary-ul trebuie oricum să existe (altfel `is_data_stale` rămâne True la fiecare pornire, iar `/api/sen/summary` ar da 500). `ensure_summary_from_data()` repară asta după `--fetch` + `--capture-prices`; `endTs` NaN/Infinity în summary e tratat ca stale (`math.isfinite`), nu ca „proaspăt" veșnic.
 
 ## 2. Convertorul: `scripts/convert-sen.py`
 
@@ -76,6 +78,7 @@ Două moduri, funcții de parsare/summary partajate (dar **ordine de coloane dif
 
 1. **`bun run data:convert`** (implicit) — citește `upload/Grafic_SEN.xlsx` cu `openpyxl` (import lazy: modul `--fetch` e stdlib-only, fără openpyxl). Coloanele sunt mapate cu `FIELDS` (ordinea xlsx: `Sold` ultimul).
 2. **`bun run data:refresh`** (`--fetch`) — descarcă **incremental** de la endpoint-ul live: pornește de la ultimul `ts` din `sen-data.json` (minus 2h overlap), merge cu dedupe pe `ts`, sortează și regenerează ambele fișiere. Coloanele sunt mapate cu `LIVE_FIELDS` (ordinea live: `Sold` pe poziția 4). Dacă nu sunt date noi, nu rescrie nimic; la eșec de rețea întoarce date goale (nu crapă); un sanity-check oprește actualizarea dacă „solarul produce noaptea" (semn de shift de coloane).
+3. **`--refresh-if-stale`** (auto-refresh, fix 0.3.29) — folosit de `scripts/dev.sh` la pornirea serverului de dev: dacă `is_data_stale(24h)` (endTs-ul din `sen-summary.json` e mai vechi de 24h, sau fișierul lipsește/e corupt), rulează `--fetch` + `--capture-prices` (exact ce fac workflow-urile GitHub); dacă datele sunt proaspete, **nu atinge rețeaua** (pornire instant). **Orice eroare neașteptată e prinsă intern și iese cu exit 0** — invariantul wrapper-ului: un eșec al refresh-ului NU blochează pornirea serverului („warning, nu blocker"). Env-uri overridable pentru teste (pattern existent): `SEN_DATA_OUT`, `SEN_SUMMARY_OUT`, `SEN_LIVE_URL` (plus cele deja existente `SEN_STORAGE_*` / `SEN_PRICES_*`).
 
 Pașii comuni:
 

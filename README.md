@@ -2,11 +2,11 @@
 
 Dashboard interactiv pentru consumul și producția de energie din **Sistemul Energetic Național** al României, construit pe baza datelor publicate de **Transelectrica**.
 
-Arhiva locală acoperă intervalul **1 iulie → 9 august 2026**, cu **5.606 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export); se extinde **automat zilnic** prin fetch incremental de pe site-ul live Transelectrica (deci intervalul rămâne la zi pe măsură ce datele noi sunt publicate). Dashboard-ul afișează **valori real-time** (Consum/Producție/Sold + mix, poll-uite la ~30s de pe `/sen-filter` — același endpoint pe care site-ul oficial îl actualizează la 10s) peste seria istorică (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
+Arhiva locală acoperă intervalul **1 iulie → 17 august 2026**, cu **6.792 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export); se extinde **automat zilnic** prin fetch incremental de pe site-ul live Transelectrica (deci intervalul rămâne la zi pe măsură ce datele noi sunt publicate). Dashboard-ul afișează **valori real-time** (Consum/Producție/Sold + mix, poll-uite la ~30s de pe `/sen-filter` — același endpoint pe care site-ul oficial îl actualizează la 10s) peste seria istorică (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
 
 Începând cu v0.3.26, dashboard-ul include și **costul estimat al importurilor/exporturilor**: volumele reale (sold, de la Transelectrica) × prețurile **PZU orare reale** (export CSV public OPCOM, fără cheie/API), afișate pe intervalul selectat cu eticheta onestă _„estimare bazată pe prețurile PZU (day-ahead)"_.
 
-![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-227%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
+![Tech stack](https://img.shields.io/badge/Next.js%2016-React%2019-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Tests](https://img.shields.io/badge/tests-240%20de%20teste%20unit%C4%83re-green) ![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 
 ---
 
@@ -61,10 +61,10 @@ bun run start      # pornește serverul de producție din .next/standalone
 
 | Script                            | Descriere                                                                                                                                             |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run dev`                     | Server de dezvoltare pe portul 3000                                                                                                                   |
+| `bun run dev`                     | Server de dezvoltare pe portul 3000 (auto-refresh date dacă sunt vechi — `scripts/dev.sh`)                                                            |
 | `bun run build`                   | Build de producție (standalone + static)                                                                                                              |
 | `bun run start`                   | Pornește build-ul standalone                                                                                                                          |
-| `bun test`                        | Rulează cele 227 de teste unitare                                                                                                                     |
+| `bun test`                        | Rulează cele 240 de teste unitare                                                                                                                     |
 | `bun run typecheck`               | Verificare tipuri TypeScript (`tsc --noEmit`)                                                                                                         |
 | `bun run lint`                    | ESLint                                                                                                                                                |
 | `bun run format` / `format:check` | Prettier (scriere / verificare)                                                                                                                       |
@@ -81,7 +81,7 @@ bun run start      # pornește serverul de producție din .next/standalone
 upload/Grafic_SEN.xlsx  (sursă istorică Transelectrica)
         │  bun run data:convert  (rebuild complet)
         ▼
-data/sen-data.json      (5.606 înregistrări tipizate, sortate crescător)
+data/sen-data.json      (6.792 înregistrări tipizate, sortate crescător)
 data/sen-summary.json   (statistici globale precalculate pentru KPI)
         ▲
         │  bun run data:refresh  (fetch incremental live, automat zilnic în CI)
@@ -167,8 +167,9 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ├── docs/                         # Documentație tehnică (arhitectură, API, UI, design, testing)
 ├── scripts/
 │   ├── convert-sen.py            # xlsx → JSON (convert) + fetch live incremental (refresh) + captură stocare/prețuri
+│   ├── dev.sh                    # wrapper bun run dev: auto-refresh date vechi + pornește serverul
 │   └── check-hydration.sh        # CI check erori de hidratare
-├── tests/                        # 227 de teste unitare (aggregate, stats, format, live, instant, storage, costs, captură)
+├── tests/                        # 240 de teste unitare (aggregate, stats, format, live, instant, storage, costs, captură)
 │   ├── sen/                      # tests/sen/*.test.ts (aggregate, stats, format, live, instant, costs)
 │   ├── storage.test.ts           # stocare ISPOZ (parser + cache + fallback + source)
 │   ├── capture-storage.test.ts   # logica Python de captură (--capture-storage, mock server)
@@ -182,7 +183,7 @@ Documentația detaliată a codului este în folderul [`docs/`](./docs/00-index.m
 ```bash
 bun run check       # totul într-o singură comandă (vezi mai jos)
 bun run typecheck   # TypeScript strict
-bun test            # 227 de teste unitare — toate trec
+bun test            # 240 de teste unitare — toate trec
 bun run lint        # ESLint curat
 bun run format:check
 bun run check:hydration  # fără erori de hidratare în browser (necesită agent-browser)
@@ -194,7 +195,7 @@ bun run check:hydration  # fără erori de hidratare în browser (necesită agen
 2. `docs:check` — documentația e la zi cu codul (hash-uri vs. fișiere sursă)
 3. `lint` — ESLint
 4. `typecheck` — `tsc --noEmit`
-5. `test` — 227 de teste unitare
+5. `test` — 240 de teste unitare
 6. `build` — build de producție (inclusiv validarea tipurilor)
 
 Rulează `bun run check` local înainte de fiecare release (sau într-un pipeline CI, dacă adaugi unul).

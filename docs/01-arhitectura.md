@@ -7,7 +7,7 @@
 Dashboard web pentru **Sistemul Energetic Național (SEN)** al României, construit pe date **Transelectrica**. Afișează consumul și producția de energie defalcate pe surse, balanța import/export și ponderea regenerabilă, la intervale de 10 minute.
 
 - Stack: **Next.js 16 (App Router) + React 19 + TypeScript strict + Tailwind 4 + shadcn/ui + Recharts + TanStack React Query**, rulat cu **Bun**.
-- Date: 5.606 înregistrări (01.07.2026 → 09.08.2026 — arhiva locală; setul crește zilnic prin fetch live Transelectrica, deci intervalul rămâne la zi), vezi [02-pipeline-date.md](./02-pipeline-date.md); fișierul istoric e `upload/Grafic_SEN.xlsx`.
+- Date: 6.792 înregistrări (01.07.2026 → 17.08.2026 — arhiva locală; setul crește zilnic prin fetch live Transelectrica, deci intervalul rămâne la zi), vezi [02-pipeline-date.md](./02-pipeline-date.md); fișierul istoric e `upload/Grafic_SEN.xlsx`.
 
 ## Layerele proiectului
 

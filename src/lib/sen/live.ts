@@ -44,7 +44,10 @@ const FETCH_RETRIES = 1;
 const FETCH_RETRY_DELAY_MS = 1_000;
 const FETCH_FAIL_TTL_MS = 60 * 1000; // backoff la eșec: nu relovim endpoint-ul timp de 1 minut
 const FETCH_OVERLAP_MS = 2 * 60 * 60 * 1000; // overlap cu ultimul punct static
-const MAX_BACKFILL_MS = 3 * 24 * 60 * 60 * 1000; // nu întreba mai mult de 3 zile înapoi
+// Cât de mult înapoi întrebăm live-ul când staticul e vechi: 30 de zile acoperă
+// preset-urile „7 zile” și „30 zile” chiar și cu data/sen-data.json stale.
+// Detalii + verificarea empirică a endpoint-ului: docs/02-pipeline-date.md.
+const MAX_BACKFILL_MS = 30 * 24 * 60 * 60 * 1000; // nu întreba mai mult de 30 de zile înapoi
 
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36";
 
@@ -179,6 +182,31 @@ export function hasSuspiciousNightSolar(readings: SenReading[]): boolean {
   return false;
 }
 
+/**
+ * Capătul din stânga al ferestrei de fetch live: cât de mult înapoi întrebăm
+ * Transelectrica. `max(lastStaticTs − overlap, now − MAX_BACKFILL_MS)`: când
+ * staticul e proaspăt, luăm doar overlap-ul (2h); când e vechi, ne întoarcem
+ * cel mult MAX_BACKFILL_MS (30 de zile) în urmă — astfel preset-urile „7 zile”
+ * ȘI „30 zile” sunt garantat acoperite chiar și cu data/sen-data.json stale.
+ * Funcție PURĂ (fără Date.now implicit) — testabilă determinist.
+ */
+export function liveBackfillFrom(lastStaticTs: number, now: number): number {
+  return Math.max(lastStaticTs - FETCH_OVERLAP_MS, now - MAX_BACKFILL_MS);
+}
+
+/**
+ * Ultimul ts static de referință pentru fereastra live. Când staticul e gol,
+ * folosim `now − MAX_BACKFILL_MS` (întregul plafon), ca liveBackfillFrom să
+ * primească fereastra completă configurată — fallback-ul vechi `now − 24h`
+ * limita fereastra la ~26h, lăsând preset-urile 3d/7d/30d aproape goale la
+ * prima rulare (fix TO_FIX round 2). Funcție PURĂ — testabilă determinist.
+ */
+export function lastStaticTs(staticReadings: SenReading[], now: number): number {
+  return staticReadings.length > 0
+    ? staticReadings[staticReadings.length - 1].ts
+    : now - MAX_BACKFILL_MS;
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -257,14 +285,17 @@ export async function getLiveReadings(): Promise<SenReading[]> {
 
 async function fetchLiveReadingsFromStatic(staticReadings: SenReading[]): Promise<SenReading[]> {
   const now = Date.now();
-  const lastStatic =
-    staticReadings.length > 0 ? staticReadings[staticReadings.length - 1].ts : now - 24 * 3600_000;
-  const from = Math.max(lastStatic - FETCH_OVERLAP_MS, now - MAX_BACKFILL_MS);
+  const from = liveBackfillFrom(lastStaticTs(staticReadings, now), now);
   // End-ul în ora României (offset EET/EEST), ca întrebare: datele sunt wall-clock RO.
   const to = now + bucharestOffsetMs(new Date(now));
   try {
+    const t0 = Date.now();
     const readings = await fetchLiveReadings(from, to);
     liveCache = { readings, fetchedAt: now };
+    // Observabilitate (fix TO_FIX P2-001): degradarea endpoint-ului Transelectrica
+    // (rate limiting, trunchiere, răspunsuri lente spre timeout-ul de 15s) trebuie
+    // vizibilă devreme — logăm durata + volumul fiecărui fetch reușit.
+    console.log(`[live] fetch OK: ${readings.length} înregistrări în ${Date.now() - t0}ms`);
     return readings;
   } catch (err) {
     // Fallback silențios: folosește cache-ul live stale (dacă e < 24h) sau datele statice.

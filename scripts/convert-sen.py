@@ -28,6 +28,7 @@ import json
 import math
 import os
 import sys
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from statistics import mean
@@ -35,10 +36,11 @@ from statistics import mean
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "upload", "Grafic_SEN.xlsx")
 OUT_DIR = os.path.join(ROOT, "data")
-OUT_DATA = os.path.join(OUT_DIR, "sen-data.json")
-OUT_SUMMARY = os.path.join(OUT_DIR, "sen-summary.json")
 # Overridable prin env pentru teste (fișiere temporare), ca să nu atingem niciodată
-# datele reale din repo: SEN_STORAGE_URL (endpoint mock) + SEN_STORAGE_OUT (fișier temp).
+# datele reale din repo — pattern existent (SEN_STORAGE_OUT / SEN_PRICES_OUT):
+# SEN_DATA_OUT / SEN_SUMMARY_OUT (fișiere temp) + SEN_LIVE_URL (endpoint mock).
+OUT_DATA = os.environ.get("SEN_DATA_OUT", os.path.join(OUT_DIR, "sen-data.json"))
+OUT_SUMMARY = os.environ.get("SEN_SUMMARY_OUT", os.path.join(OUT_DIR, "sen-summary.json"))
 OUT_STORAGE = os.environ.get("SEN_STORAGE_OUT", os.path.join(OUT_DIR, "sen-storage.json"))
 # Prețurile PZU (OPCOM): SEN_PRICES_OUT (fișier temp pt teste) + template-ul de URL
 # (endpoint public, fără cheie) + backfill-days overridable pt teste (mock server).
@@ -88,10 +90,11 @@ SOURCES = ["carbune", "hidrocarburi", "ape", "nuclear", "eolian", "foto", "bioma
 # Răspuns: text — rânduri separate prin „|”, câmpuri separate prin „;”:
 #   "09-08-2026 00:09:47;5435;5282;6354;-918;778;1267;1113;680;2435;-14;60;|..."
 # Prima coloană e timpul wall-clock România (DD-MM-YYYY HH:MM:SS), urmat de cele 11 câmpuri.
-LIVE_URL = (
+LIVE_URL = os.environ.get(
+    "SEN_LIVE_URL",
     "https://www.transelectrica.ro/widget/web/tel/sen-grafic"
     "?p_p_id=SENGrafic_WAR_SENGraficportlet"
-    "&p_p_lifecycle=2&p_p_state=maximized&p_p_mode=view"
+    "&p_p_lifecycle=2&p_p_state=maximized&p_p_mode=view",
 )
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 
@@ -316,6 +319,92 @@ def refresh_from_live():
         return
 
     write_outputs(merged)
+
+
+def is_data_stale(max_age_h: float = 24.0) -> bool:
+    """True dacă datele statice sunt mai vechi decât `max_age_h` ore.
+
+    Citește doar `endTs` din `OUT_SUMMARY` (fișierul e mic). Fișier lipsă sau
+    corupt → True (tratăm ca stale: la prima rulare nu există date). Folosită
+    de modulul `--refresh-if-stale` (auto-refresh la pornirea dev serverului).
+    Pură și deterministă — testabilă direct.
+    """
+    try:
+        with open(OUT_SUMMARY, encoding="utf-8") as f:
+            summary = json.load(f)
+        end_ts = summary.get("endTs")
+        # endTs NaN/Infinity (JSON corupt) ar trece de isinstance (sunt floats) și
+        # ar face `age_h` non-finit → `nan > max_age_h` e False → datele ar părea
+        # veșnic „proaspete" și refresh-ul n-ar mai rula niciodată. Tratăm orice
+        # valoare non-finită ca stale (corupție de date) — fix TO_FIX round 2.
+        if not isinstance(end_ts, (int, float)) or not math.isfinite(end_ts):
+            return True
+        age_h = (time.time() - end_ts / 1000) / 3600
+        return age_h > max_age_h
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return True
+
+
+def refresh_if_stale(max_age_h: float = 24.0) -> None:
+    """Modul `--refresh-if-stale`: aduce datele la zi dacă sunt vechi.
+
+    Rulează exact ce fac workflow-urile GitHub (`--fetch` + `--capture-prices`),
+    doar când `is_data_stale(max_age_h)` e adevărat. Dacă datele sunt proaspete,
+    nu atinge rețeaua (pornire instant). Orice eroare neașteptată e prinsă și
+    raportată ca warning, fără să propage exit non-zero — invariantul folosit de
+    wrapper-ul `scripts/dev.sh`: un eșec al refresh-ului NU blochează pornirea
+    serverului („warning, nu blocker”). Funcțiile de fetch prind deja erorile de
+    rețea intern (întorc date goale fără să arunce), deci fallback-ul e dublu.
+    """
+    try:
+        if not is_data_stale(max_age_h):
+            print(f"[refresh-if-stale] Date proaspete (< {max_age_h:.0f}h) — nimic de făcut.", file=sys.stderr)
+            return
+        print(f"[refresh-if-stale] Date vechi (> {max_age_h:.0f}h) — aduc la zi…", file=sys.stderr)
+        refresh_from_live()
+        capture_prices()
+        # Dacă live-ul a eșuat sau a adus doar duplicate, refresh_from_live iese
+        # devreme fără să scrie — dar un sen-summary.json lipsă/corupt trebuie
+        # oricum reconstruit din records-urile valide (altfel is_data_stale ar
+        # rămâne True la fiecare pornire, iar /api/sen/summary ar da 500).
+        ensure_summary_from_data()
+    except Exception as e:  # pragma: no cover — eroare neașteptată, oricum nu blocăm
+        print(f"[refresh-if-stale] AVERTIZARE: refresh eșuat ({e}) — continui cu datele existente.", file=sys.stderr)
+
+
+def ensure_summary_from_data() -> None:
+    """Reconstruiește OUT_SUMMARY din records-urile valide dacă e lipsă/corupt.
+
+    Folosită de `refresh_if_stale` DUPĂ `refresh_from_live()` + `capture_prices()`:
+    când live-ul eșuează (rețea) sau întoarce doar timestamps duplicate,
+    `refresh_from_live` iese devreme fără să scrie nimic — dar dacă sen-data.json
+    are records valide, summary-ul trebuie oricum să existe (altfel is_data_stale
+    rămâne True la fiecare pornire, iar runtime-ul /api/sen/summary ar da 500).
+    Invariant: nu aruncă niciodată (e apelat din try-ul lui refresh_if_stale,
+    dar toleranța e dublă) — fix TO_FIX round 2.
+    """
+    try:
+        with open(OUT_SUMMARY, encoding="utf-8") as f:
+            json.load(f)
+        return  # summary deja valid
+    except (OSError, json.JSONDecodeError):
+        pass
+    try:
+        existing = read_existing()
+        if not existing:
+            return
+        summary = build_summary(existing)
+        with open(OUT_SUMMARY, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2, ensure_ascii=False)
+        print(
+            f"[refresh-if-stale] OUT_SUMMARY reconstruit din {len(existing)} records existente",
+            file=sys.stderr,
+        )
+    except Exception as e:
+        print(
+            f"[refresh-if-stale] AVERTIZARE: nu am putut reconstrui OUT_SUMMARY ({e})",
+            file=sys.stderr,
+        )
 
 
 # Overridable prin env pentru teste (mock server local): SEN_STORAGE_URL.
@@ -677,6 +766,8 @@ if __name__ == "__main__":
         capture_storage()
     elif "--capture-prices" in sys.argv:
         capture_prices()
+    elif "--refresh-if-stale" in sys.argv:
+        refresh_if_stale()
     elif "--fetch" in sys.argv:
         refresh_from_live()
     else:

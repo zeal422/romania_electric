@@ -7,6 +7,8 @@ import {
   getLiveReadings,
   getLiveSummary,
   hasSuspiciousNightSolar,
+  lastStaticTs,
+  liveBackfillFrom,
   LIVE_URL,
   mergeReadings,
   parseLiveLine,
@@ -167,6 +169,48 @@ describe("buildLiveUrl", () => {
   });
 });
 
+describe("liveBackfillFrom (fereastra de fetch live)", () => {
+  const DAY = 24 * 3600_000;
+  const now = Date.UTC(2026, 7, 17, 12, 0, 0); // 17 aug 12:00 UTC — ancrat, determinist
+
+  it("acoperă preset-ul „7 zile” chiar și când staticul e vechi (fix 0.3.28)", () => {
+    // Static înghețat acum 8 zile (exact scenariul real: data/sen-data.json pe 9 aug):
+    // fereastra live trebuie să meargă înapoi cel puțin 7 zile, ca graficele să
+    // primească date pentru tot intervalul promis de butonul „7 zile”. Cu plafonul
+    // vechi de 3 zile, `now − from` = 3 zile < 7 → testul pică (regresie prinsă).
+    const staleStatic = now - 8 * DAY;
+    const from = liveBackfillFrom(staleStatic, now);
+    expect(now - from).toBeGreaterThanOrEqual(7 * DAY);
+  });
+
+  it("nu întreabă mai departe de plafonul de 30 de zile (payload rezonabil) — fix TO_FIX round 2", () => {
+    // Static foarte vechi → fereastra e plafonată la MAX_BACKFILL_MS (30 de zile),
+    // nu mai departe. Pe codul vechi (10 zile) testul pica: `now − from` era 10 zile.
+    const veryOldStatic = now - 40 * DAY;
+    const from = liveBackfillFrom(veryOldStatic, now);
+    expect(now - from).toBeLessThanOrEqual(30 * DAY);
+    // Și garantia preset-ului „30 zile” trebuie să țină: fereastra e exact plafonul.
+    expect(now - from).toBeGreaterThanOrEqual(30 * DAY);
+  });
+
+  it("cu static gol, fereastra live folosește întregul plafon (30 de zile), nu doar 26h — fix TO_FIX round 2", () => {
+    // Fallback-ul pe static gol (lastStaticTs cu array gol) trebuie să dea
+    // `now − MAX_BACKFILL_MS`, ca liveBackfillFrom să primească fereastra completă.
+    // Pe codul vechi (`now − 24h` inline) fereastra era doar ~26h → testul pica.
+    const from = liveBackfillFrom(lastStaticTs([], now), now);
+    expect(now - from).toBeGreaterThanOrEqual(30 * DAY);
+    expect(now - from).toBeLessThanOrEqual(30 * DAY + 1);
+  });
+
+  it("cu static proaspăt, întreabă doar overlap-ul (2h) — fără backfill inutil", () => {
+    // Static de 1h vechi → from = lastStatic − 2h overlap = now − 3h (nu 10 zile).
+    const freshStatic = now - 1 * 3600_000;
+    const from = liveBackfillFrom(freshStatic, now);
+    expect(now - from).toBeLessThanOrEqual(3 * 3600_000);
+    expect(from).toBeLessThanOrEqual(freshStatic);
+  });
+});
+
 describe("getLiveReadings / getLiveSummary (fetch mock-uit)", () => {
   // Construiește un payload live relativ la ultimul ts static (endTs din repo),
   // ca testele să nu depindă de cât de noi sunt datele de pe disc.
@@ -198,6 +242,27 @@ describe("getLiveReadings / getLiveSummary (fetch mock-uit)", () => {
     expect(summary.latest.t).toBe(last.t);
     expect(summary.endTs).toBe(endTs + 20 * 60_000);
     expect(summary.count).toBeGreaterThan(0);
+  });
+
+  it("loghează durata + volumul fetch-ului reușit (observabilitate — fix TO_FIX P2-001)", async () => {
+    const livePayload = await payloadNewerThanStatic();
+    globalThis.fetch = mock(
+      async () => new Response(livePayload, { status: 200 }),
+    ) as unknown as typeof fetch;
+
+    // Spy pe console.log: mesajul de observabilitate trebuie să conțină numărul
+    // de înregistrări aduse de live (2, din payload) + durata în ms.
+    const logs: string[] = [];
+    const origLog = console.log;
+    console.log = (msg: unknown) => logs.push(String(msg));
+    try {
+      await getLiveReadings();
+    } finally {
+      console.log = origLog;
+    }
+    expect(
+      logs.some((l) => l.includes("[live] fetch OK: 2 înregistrări") && /\d+ms$/.test(l)),
+    ).toBe(true);
   });
 
   it("falls back to static data when the live fetch fails (no throw)", async () => {
