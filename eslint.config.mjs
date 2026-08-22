@@ -45,6 +45,35 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
+  // Gardă mecanică pentru contractul de timp fake-UTC (AGENTS.md §4.7): wall-clock
+  // România etichetat UTC, afișat fidel prin getters UTC. Getterii locali și
+  // constructorii locali produc valori dependente de fusul mașinii — bug-urile
+  // reale din 0.2.2 (getters locale) și 0.3.27 (off-by-one calendar).
+  files: ["src/lib/sen/**/*.ts"],
+  ignores: ["src/lib/sen/calendar.ts"], // excepția intenționată: input calendar în fusul LOCAL al browserului
+  rules: {
+    "no-restricted-syntax": [
+      "error",
+      {
+        selector:
+          "CallExpression[callee.property.name=/^(getFullYear|getMonth|getDate|getDay|getHours|getMinutes|getSeconds|getMilliseconds|getTimezoneOffset)$/]",
+        message:
+          "Getter local interzis în stratul fake-UTC — folosește variantele UTC (getUTCHours etc.). Contract de timp: AGENTS.md §4.7.",
+      },
+      {
+        selector:
+          "CallExpression[callee.property.name=/^toLocale(String|DateString|TimeString)$/][arguments.length<2]",
+        message:
+          'toLocale* fără opțiuni e interzis în stratul fake-UTC — trece mereu { timeZone: "UTC" } (pattern existent în format.ts). Contract de timp: AGENTS.md §4.7.',
+      },
+      {
+        selector: "NewExpression[callee.name='Date'][arguments.length>=2]",
+        message:
+          "Constructorul local new Date(y,m,d,...) e interzis în stratul fake-UTC — folosește Date.UTC(...). Contract de timp: AGENTS.md §4.7.",
+      },
+    ],
+  },
+}, {
   ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", "data", "scripts/**", "tests/**"],
 }, prettierConfig];
 

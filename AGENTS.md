@@ -8,7 +8,7 @@ Acest fișier îi ajută pe agenții AI (și pe orice dezvoltator nou) să lucre
 
 Dashboard interactiv pentru **Sistemul Energetic Național (SEN) al României**, cu date Transelectrica:
 
-- **6.792 de înregistrări** la ~10 minute (01.07.2026 → 17.08.2026), în creștere zilnică (date live Transelectrica).
+- Istoric la ~10 minute, din 01.07.2026, în creștere zilnică (date live Transelectrica); cifra și intervalul curente le expune `/api/sen/summary`.
 - Câmpuri: `consum`, `medieConsum`, `productie`, `carbune`, `hidrocarburi`, `ape`, `nuclear`, `eolian`, `foto`, `biomasa`, `sold`. **Semantica sold** (confirmată pe sursa oficială, `SOLD = CONS − PROD`): pozitiv = import, negativ = export. ⚠️ **Ordinea coloanelor de la endpoint-ul live diferă de xlsx** — live pune `sold` pe poziția 4 (vezi [docs/02](./docs/02-pipeline-date.md)).
 - Stack: **Next.js 16 (App Router) + React 19 + TypeScript strict + Tailwind 4 + shadcn/ui + Recharts + React Query**, rulat cu **Bun**.
 

@@ -2,7 +2,7 @@
 
 Dashboard interactiv pentru consumul și producția de energie din **Sistemul Energetic Național** al României, construit pe baza datelor publicate de **Transelectrica**.
 
-Arhiva locală acoperă intervalul **1 iulie → 17 august 2026**, cu **6.792 de înregistrări** la intervale de ~10 minute (consum, producție pe surse, sold import/export); se extinde **automat zilnic** prin fetch incremental de pe site-ul live Transelectrica (deci intervalul rămâne la zi pe măsură ce datele noi sunt publicate). Dashboard-ul afișează **valori real-time** (Consum/Producție/Sold + mix, poll-uite la ~30s de pe `/sen-filter` — același endpoint pe care site-ul oficial îl actualizează la 10s) peste seria istorică (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
+Arhiva locală pornește din **1 iulie 2026** și crește **automat zilnic** prin fetch incremental de pe site-ul live Transelectrica, la intervale de ~10 minute (consum, producție pe surse, sold import/export) — numărul curent de înregistrări și ultima dată acoperită le expune `GET /api/sen/summary` (`count`, `startTs`, `endTs`). Dashboard-ul afișează **valori real-time** (Consum/Producție/Sold + mix, poll-uite la ~30s de pe `/sen-filter` — același endpoint pe care site-ul oficial îl actualizează la 10s) peste seria istorică (cache 10 min, cu fallback la datele stale din cache — max 24h — sau la cele statice dacă Transelectrica e indisponibilă).
 
 Începând cu v0.3.26, dashboard-ul include și **costul estimat al importurilor/exporturilor**: volumele reale (sold, de la Transelectrica) × prețurile **PZU orare reale** (export CSV public OPCOM, fără cheie/API), afișate pe intervalul selectat cu eticheta onestă _„estimare bazată pe prețurile PZU (day-ahead)"_.
 
@@ -81,7 +81,7 @@ bun run start      # pornește serverul de producție din .next/standalone
 upload/Grafic_SEN.xlsx  (sursă istorică Transelectrica)
         │  bun run data:convert  (rebuild complet)
         ▼
-data/sen-data.json      (6.792 înregistrări tipizate, sortate crescător)
+data/sen-data.json      (istoric tipizat, sortat crescător)
 data/sen-summary.json   (statistici globale precalculate pentru KPI)
         ▲
         │  bun run data:refresh  (fetch incremental live, automat zilnic în CI)

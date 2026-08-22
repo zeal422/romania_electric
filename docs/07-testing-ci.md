@@ -14,7 +14,7 @@ Ordinul (definit în `package.json`):
 
 1. **`format:check`** — Prettier (verifică `src/**`, `tests/**`, `*.md` din rădăcină și `docs/**/*.md`)
 2. **`docs:check`** — verifică că documentația e la zi cu codul (vezi mai jos)
-3. **`lint`** — ESLint
+3. **`lint`** — ESLint, incl. **garda fake-UTC** (`eslint.config.mjs`, v0.3.33): pe tot `src/lib/sen/**`, cu excepția intenționată `calendar.ts` (input calendar în fusul local al browserului), `no-restricted-syntax` interzice mecanic getterii locali de dată (inclusiv `getTimezoneOffset`), apelurile `toLocale*` fără opțiuni `{ timeZone: "UTC" }` și constructorul local `new Date(y,m,d,…)` — contractul de timp din AGENTS §4.7 e protejat de regulă, nu doar prin disciplină
 4. **`typecheck`** — `tsc --noEmit` (TypeScript strict)
 5. **`test`** — `bun test` (240 de teste unitare)
 6. **`build`** — `next build` (build standalone, **include validarea tipurilor** — `ignoreBuildErrors` e eliminat)

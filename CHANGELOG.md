@@ -6,6 +6,28 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.33] — 2026-08-21, 21:05 EEST
+
+### Adăugat
+
+- **Gardă ESLint pentru contractul de timp fake-UTC** (`eslint.config.mjs`): regulă nouă `no-restricted-syntax` pe tot `src/lib/sen/**` — cu excepția intenționată `calendar.ts` (input calendar în fusul LOCAL al browserului, fix 0.3.27) — care interzice mecanic:
+  - getterii locali de dată (`getFullYear`…`getMilliseconds`, inclusiv `getTimezoneOffset`) — doar variantele UTC rămân permise;
+  - apelurile `toLocale*` fără opțiuni — pattern-ul obligatoriu e `toLocaleString(RO, { timeZone: "UTC" })`, cum apare deja în 5 locuri în `format.ts`;
+  - constructorul local `new Date(y,m,d,…)` — doar `Date.UTC(...)`.
+
+  Motivație: contractul era protejat doar prin disciplină, iar bug-urile reale din 0.2.2 (getters locale) și 0.3.27 (off-by-one calendar) arată exact clasa de risc — un agent viitor poate reintroduce getters locali crezând că „repară". Verificare §4.14 bidirecțională: lint verde pe tot codul actual (zero fals-pozitive, inclusiv pe cele 14 module sen); un fișier sintetic cu toate cele 3 clase de încălcare produce exact 5 erori; test de control fără excepția `calendar.ts` prinde exact cei 3 getteri intenționați de la liniile 21–23 (dovedește că regula e activă prin stack-ul real de config). Limite cunoscute, acceptate explicit: apelurile prin destructuring scapă selectorului, `new Date(...spread)` numără 1 argument AST, iar `toLocale(RO,{})` cu opțiuni fără cheia `timeZone` nu e prins (selector mai profund = fragil; riscul rezidual e mic pentru că pattern-ul complet există inline peste tot). Fără test nou în `bun test`: suita nu testează config-ul ESLint, iar protocolul bidirecțional de mai sus ESTE verificarea pentru această clasă de schimbare (precedent: mutarea `STORAGE_TREND_THRESHOLD_MW`, 0.3.11).
+
+### Notă operațională (fără schimbări de repo)
+
+- **Captura orară ISPOZ rulează acum local**, printr-un timer systemd user (`~/.config/systemd/user/sen-storage-capture.{service,timer}` — `OnCalendar=hourly`, `Persistent=true`; echivalentul local al workflow-ului `storage-capture.yml`, care nu poate rula fără remote GitHub). Scriptul apelat e cel existent (`convert-sen.py --capture-storage`, idempotent, tolerant la rețea). Prima captură locală: seria `data/sen-storage.json` a crescut **2 → 3 puncte** (488 MW la 20:57 EEST), reluând seria oprită pe 09.08. Limitări conștiente: capturi doar când PC-ul e pornit și sesiunea e logată (linger off, lăsat nemodificat; `Persistent=true` recuperează o captură ratată la pornirea sesiunii); timer-ul devine redundant când repo-ul urcă pe GitHub și se dezactivează atunci.
+
+### Corectat (documentație/versiune)
+
+- **package.json**: `0.3.27 → 0.3.33` — sincronizat drift-ul pre-existent (bump-urile fuseseră omise începând cu 0.3.28; CHANGELOG era deja la 0.3.32).
+- **docs/07**: pasul `lint` descrie acum garda fake-UTC; **docs/08**: rând nou în harta „Teste & tooling" („Unde e garda anti-getter-local?" → `eslint.config.mjs`). Ambele documente acoperă `package.json` în manifest → actualizate cu conținut real + re-verificate.
+- **docs/01**: marcat verificat fără modificare de conținut — singura sursă acoperită schimbată e `package.json`, ne-citată în proza documentului (cazul „cosmetic", sancționat explicit de ieșirea `docs:check`); acuratețea conținutului confirmată prin citire înainte de marcare.
+- **Eliminate cifrele fixe care drifteau zilnic** din `README.md` (proză + diagrama pipeline), `AGENTS.md` (§1), `docs/01` și `docs/02`: count-ul de înregistrări și data ultimei înregistrări deveneau depășite la fiecare refresh incremental (găsire pre-existentă P3, raportată identic de code-review și myrabbit). Proza descrie acum mecanismul și trimite la sursa de adevăr — `GET /api/sen/summary` (`count`, `startTs`, `endTs`) — păstrând doar părțile stabile (start 01.07.2026, cadența ~10 min). Mențiunile istorice din CHANGELOG rămân înghețate corect (descriu starea de la data intrării).
+
 ## [0.3.32] — 2026-08-18, 11:20 EEST
 
 ### Corectat

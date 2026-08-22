@@ -9,7 +9,7 @@ upload/Grafic_SEN.xlsx   ← sursă istorică Transelectrica (rebuild complet)
         │
         │  bun run data:convert  (= python3 scripts/convert-sen.py)
         ▼
-data/sen-data.json       ← 6.792 înregistrări tipizate, sortate crescător după ts
+data/sen-data.json       ← istoric tipizat, sortat crescător după ts
 data/sen-summary.json    ← statistici globale precalculate (KPI instant)
         ▲
         │  bun run data:refresh  (= python3 scripts/convert-sen.py --fetch)

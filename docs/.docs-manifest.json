@@ -10,7 +10,7 @@
       "src/lib/sen/index.ts": "9a9f03c36bba7c9923efb26ad5cafc5d39a578fc32c42aba685a6b324735e4e6",
       "src/lib/utils.ts": "d1f1e0d62cb8d8d1e04c26e14de842d8a151f75812d81b046c65b5d1fe8e4b27",
       "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
-      "package.json": "a853a2d638148adb7def2dfeade8576c88846a70c1455b04de24d9aa3a2688dc",
+      "package.json": "9e781b6a5be58607dbe55fa43daa6513035cd019d5d49057dfc373a14db5e1ef",
       "src/lib/sen/live.ts": "c5323c788e9a02092564aef4da6c96bed6c307ff0d4b87a6315e659a578ce7c4",
       "src/lib/sen/storage.ts": "677aa7416d1ead33bf9f31aed38e440e30c76f2d63225bbc3aa76508d713e38a",
       "src/components/dashboard/storage-card.tsx": "f5d493851ff90bcaa6edaf7a28977dfa1c78bcf70b9a00b6453655445ca3955c",
@@ -108,7 +108,7 @@
   },
   "docs/07-testing-ci.md": {
     "covers": {
-      "package.json": "a853a2d638148adb7def2dfeade8576c88846a70c1455b04de24d9aa3a2688dc",
+      "package.json": "9e781b6a5be58607dbe55fa43daa6513035cd019d5d49057dfc373a14db5e1ef",
       "scripts/check-hydration.sh": "4cd8ec4a837765ccf3ebf69d7773a675c2a10c4f144c844ec1f0f12b18bb40c1",
       "scripts/check-docs-stale.sh": "3bbb52e1c2392c29406f32f875f32d291c2132f0da349259a67fa337e2deaca2",
       "scripts/mark-docs-verified.sh": "b2ad1538c3c69627ce8d3612fc51f678d45367d55ccddf76193f4a816ad7973f",
@@ -167,7 +167,7 @@
       "tests/sen/aggregate.test.ts": "8b6307193e2335b7e0e7b1e8018fd363b2bf15d05c2ea137c82ddaa3a5db0d3b",
       "tests/sen/stats.test.ts": "eb65d371a261cb14dd3b5e77df77c54a9928f2c8571315644a31ad43439a768e",
       "tests/sen/format.test.ts": "019189a08404fbde6ab4986b21bcdf4072bd3d2ae935ccf82414b537fdc249bb",
-      "package.json": "a853a2d638148adb7def2dfeade8576c88846a70c1455b04de24d9aa3a2688dc",
+      "package.json": "9e781b6a5be58607dbe55fa43daa6513035cd019d5d49057dfc373a14db5e1ef",
       "next.config.ts": "a11269de104e075f53eb20a9c40f1d4ca6eebdfecd1b1009a5a00fd383ccdc75",
       "src/lib/sen/live.ts": "c5323c788e9a02092564aef4da6c96bed6c307ff0d4b87a6315e659a578ce7c4",
       "tests/sen/live.test.ts": "075748f5d40d6b6c229945cba1b18c60317c8853bc9196e027b29a4281314a06",
