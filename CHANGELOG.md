@@ -6,6 +6,23 @@ Formatul respectă [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), iar
 
 Timestamp-urile sunt în **ora României** (EEST, UTC+3 — vara; EET, UTC+2 — iarna).
 
+## [0.3.34] — 2026-08-23, 20:02 EEST
+
+### Adăugat
+
+- **Gardă de deploy: `outputFileTracingIncludes` pentru `data/*.json`** (`next.config.ts`): cheia nouă `"/api/**": ["./data/**"]` include explicit fișierele de date în bundle-ul fiecărei rute API. Rutele server-only (`loader.ts`, `prices.ts`, `storage.ts`) citesc `data/*.json` cu `fs.readFile(path.join(process.cwd(), …))` la runtime; azi node-file-trace le include deja implicit prin analiza statică a apelurilor (verificat empiric pe artefacte: fiecare `.nft.json` per-rută conține exact fișierele citite de ruta respectivă), dar asta e detaliu de implementare Next, nu contract — un refactor spre căi dinamice sau un schimb major de tracing l-ar rupe silențios. Config-ul transformă dependența implicită în contract declarat; glob-ul `/api/**` acoperă automat și rute viitoare (inclusiv `instant`, care azi nu citește date), iar paginile sunt scutite intenționat (client-only, datele vin prin React Query).
+- **Documentație**: decizia documentată în `docs/01` („Decizii cheie de arhitectură") — `output: "standalone"` + `outputFileTracingIncludes`, cu raționamentul complet.
+- **README**: secțiune nouă „Publicare (git → GitHub → Vercel)" — fluxul canonic (`updates` → merge `main` → `pull --rebase` → `push`), rolul commit-urilor automate de date și ce faci la un push respins cu `(fetch first)`.
+
+### Verificare (§4.14)
+
+- **Efect pe artefacte, confirmat după build**: `.next/standalone/data/` conține toate cele 4 JSON-uri (ca înainte), iar trace-urile per-rută se lărgesc exact cât promite config-ul — **fiecare rută din `/api/**` primește acum toate cele 4 fișiere**, inclusiv rutele care nu le citesc integral (`instant` — niciunul înainte; `storage` — doar `sen-storage` înainte). Supra-includerea e intenționată (contract uniform pe tot `/api/**`; ~1,8 MB nefolosit per funcție, comprimat la deploy), iar comportamentul runtime e neschimbat — fiecare rută citește doar ce citea și înainte. Fără test nou în `bun test`: suita nu acoperă config de build (precedente: 0.3.11, 0.3.33); verificarea acestei clase de schimbare = artefacte de build + curl-uri post-deploy.
+
+### Notă
+
+- Starea anterioară era dovedit funcțională pentru deploy — schimbarea e **declarativă** (hardening ieftin contra unui mod de eșec silențios), nu o corecție de bug.
+- **package.json**: `0.3.33 → 0.3.34`.
+
 ## [0.3.33] — 2026-08-21, 21:05 EEST
 
 ### Adăugat

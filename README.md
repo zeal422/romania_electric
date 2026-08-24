@@ -200,6 +200,22 @@ bun run check:hydration  # fără erori de hidratare în browser (necesită agen
 
 Rulează `bun run check` local înainte de fiecare release (sau într-un pipeline CI, dacă adaugi unul).
 
+## Publicare (git → GitHub → Vercel)
+
+Branch-ul de lucru e `updates`; `main` e producția — Vercel publică automat orice ajunge pe `main`. Fluxul:
+
+```bash
+bun run dev                                # 1. lucrezi + testezi pe localhost
+bun run check                              # 2. poarta înainte de publicare
+git checkout updates && git add . && git commit -m "fix: …"   # 3. împachetezi munca
+git checkout main && git merge updates     # 4. duci în main
+git pull --rebase origin main              # 5. integrezi commit-urile automate de date apărute între timp
+git push                                   # 6. declanșează deploy-ul Vercel (~2 min) → live
+git checkout updates                       # 7. te întorci la lucru
+```
+
+Workflow-urile de date (`data-refresh`, `storage-capture`, `price-capture`) fac singure commit-uri `chore(data): …` pe `main` (zilnic, respectiv orar); fiecare declanșează un redeploy Vercel cu datele noi. Pasul 5 nu creează nimic de comitat — aduce doar acele commit-uri deja făcute de workflow-uri și lasă working tree-ul curat. Dacă uiți pasul 5, push-ul e respins politicos cu `(fetch first)`: rulezi comanda din pasul 5 și repeți push-ul.
+
 ## Considerații de arhitectură
 
 - **Loader-ul (`src/lib/sen/loader.ts`) și datele live (`src/lib/sen/live.ts`) rulează DOAR pe server** (`node:fs` / `fetch`) — nu le importa în cod de client.
