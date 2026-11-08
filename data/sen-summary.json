@@ -1,79 +1,79 @@
 {
-  "count": 18668,
+  "count": 18814,
   "start": "2026-07-01T18:11:06.000Z",
-  "end": "2026-11-07T12:20:30.000Z",
+  "end": "2026-11-08T12:36:55.000Z",
   "startTs": 1782929466000,
-  "endTs": 1794054030000,
+  "endTs": 1794141415000,
   "latest": {
-    "t": "2026-11-07T12:20:30.000Z",
-    "ts": 1794054030000,
-    "consum": 4722.0,
-    "medieConsum": 4997.0,
-    "productie": 7392.0,
-    "sold": -2669.0,
-    "carbune": 574.0,
-    "hidrocarburi": 1522.0,
-    "ape": 411.0,
-    "nuclear": 273.0,
-    "eolian": 2652.0,
-    "foto": 1881.0,
-    "biomasa": 72.0
+    "t": "2026-11-08T12:36:55.000Z",
+    "ts": 1794141415000,
+    "consum": 3896.0,
+    "medieConsum": 3708.0,
+    "productie": 5750.0,
+    "sold": -1853.0,
+    "carbune": 529.0,
+    "hidrocarburi": 1542.0,
+    "ape": 393.0,
+    "nuclear": 591.0,
+    "eolian": 472.0,
+    "foto": 2149.0,
+    "biomasa": 70.0
   },
   "stats": {
     "consum": {
       "min": 2716.0,
       "max": 8224.0,
-      "avg": 5549.3
+      "avg": 5549.0
     },
     "medieConsum": {
       "min": 2791.0,
       "max": 8078.0,
-      "avg": 5549.4
+      "avg": 5549.0
     },
     "productie": {
       "min": 2133.0,
       "max": 7929.0,
-      "avg": 4968.4
+      "avg": 4968.7
     },
     "carbune": {
       "min": 334.0,
       "max": 1239.0,
-      "avg": 737.1
+      "avg": 735.9
     },
     "hidrocarburi": {
       "min": 226.0,
       "max": 2151.0,
-      "avg": 1158.1
+      "avg": 1161.5
     },
     "ape": {
       "min": 188.0,
       "max": 2329.0,
-      "avg": 1057.3
+      "avg": 1055.2
     },
     "nuclear": {
       "min": 0.0,
       "max": 1304.0,
-      "avg": 331.0
+      "avg": 331.6
     },
     "eolian": {
       "min": -26.0,
       "max": 2963.0,
-      "avg": 791.4
+      "avg": 792.3
     },
     "foto": {
       "min": -19.0,
       "max": 3453.0,
-      "avg": 755.6
+      "avg": 754.1
     },
     "biomasa": {
       "min": 10.0,
       "max": 77.0,
-      "avg": 57.7
+      "avg": 57.8
     },
     "sold": {
       "min": -3383.0,
       "max": 3425.0,
-      "avg": 580.7
+      "avg": 580.2
     }
   },
   "sources": [
@@ -85,13 +85,13 @@
     "foto",
     "biomasa"
   ],
-  "renewableShareAvg": 53.6,
+  "renewableShareAvg": 53.5,
   "balance": {
-    "importSamples": 13173,
-    "exportSamples": 5485,
-    "importShare": 70.6,
-    "avgImport": 1156.5,
-    "avgExport": -801.0,
-    "netAvg": 580.7
+    "importSamples": 13273,
+    "exportSamples": 5530,
+    "importShare": 70.5,
+    "avgImport": 1159.0,
+    "avgExport": -808.0,
+    "netAvg": 580.2
   }
 }
